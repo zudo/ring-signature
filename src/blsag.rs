@@ -1,5 +1,6 @@
 use crate::point;
 use crate::scalar;
+use crate::Secret;
 use curve25519_dalek::constants;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
@@ -20,11 +21,11 @@ pub struct BLSAG {
 impl BLSAG {
     pub fn sign<Hash: Digest<OutputSize = U64> + Clone>(
         rng: &mut impl CryptoRngCore,
-        secret_key: &[u8; 32],
+        secret: &Secret,
         ring: &Vec<[u8; 32]>,
         data: impl AsRef<[u8]>,
     ) -> Option<BLSAG> {
-        let secret_scalar_0 = scalar::from_slice(secret_key);
+        let secret_scalar_0 = secret.0;
         let key_image = BLSAG::key_image::<Hash>(secret_scalar_0);
         let mut ring_0 = point::vec_1d::from_slice(ring)?;
         let secret_index = rng.gen_range(0..=ring_0.len());
@@ -149,8 +150,8 @@ mod test {
     #[test]
     fn blsag() {
         let rng = &mut OsRng {};
-        let secret_key_0 = scalar::random(rng).to_bytes();
-        let secret_key_1 = scalar::random(rng).to_bytes();
+        let secret_key_0 = Secret::new(rng);
+        let secret_key_1 = Secret::new(rng);
         let data_0 = b"hello";
         let data_1 = b"world";
         for n in 2..11 {

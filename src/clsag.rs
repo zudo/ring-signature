@@ -1,5 +1,6 @@
 use crate::point;
 use crate::scalar;
+use crate::Secret;
 use curve25519_dalek::constants;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
@@ -20,11 +21,11 @@ pub struct CLSAG {
 impl CLSAG {
     pub fn sign<Hash: Digest<OutputSize = U64> + Clone>(
         rng: &mut impl CryptoRngCore,
-        secret_keys: &Vec<[u8; 32]>,
+        secrets: &[Secret],
         rings: &Vec<Vec<[u8; 32]>>,
         data: impl AsRef<[u8]>,
     ) -> Option<CLSAG> {
-        let secret_scalars = scalar::vec_1d::from_slice(secret_keys);
+        let secret_scalars = secrets.iter().map(|x| x.0).collect::<Vec<_>>();
         let key_images = CLSAG::key_image::<Hash>(&secret_scalars);
         let mut rings = point::vec_2d::from_slice(rings)?;
         let public_points = secret_scalars
@@ -262,13 +263,15 @@ mod test {
         let rng = &mut OsRng {};
         let ring_size = 2;
         let ring_layers = 2;
-        let secret_keys = scalar::vec_1d::to_bytes(&scalar::vec_1d::random(rng, ring_layers));
+        let secrets = (0..ring_layers)
+            .map(|_| Secret::new(rng))
+            .collect::<Vec<_>>();
         let data_0 = b"hello";
         let data_1 = b"world";
         let ring_0 = point::vec_2d::to_bytes(&point::vec_2d::random(ring_size - 1, ring_layers));
         let ring_1 = point::vec_2d::to_bytes(&point::vec_2d::random(ring_size - 1, ring_layers));
-        let blsag_0 = CLSAG::sign::<Sha512>(rng, &secret_keys, &ring_0, data_0).unwrap();
-        let blsag_1 = CLSAG::sign::<Sha512>(rng, &secret_keys, &ring_1, data_1).unwrap();
+        let blsag_0 = CLSAG::sign::<Sha512>(rng, &secrets, &ring_0, data_0).unwrap();
+        let blsag_1 = CLSAG::sign::<Sha512>(rng, &secrets, &ring_1, data_1).unwrap();
         assert!((blsag_0.verify::<Sha512>(data_0)));
         assert!((blsag_1.verify::<Sha512>(data_1)));
         println!("{:?}", blsag_0.key_images);

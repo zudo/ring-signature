@@ -1,14 +1,14 @@
 use rand_core::OsRng;
 use ring_signature::clsag::CLSAG;
 use ring_signature::point;
-use ring_signature::scalar;
+use ring_signature::Secret;
 use sha2::Sha512;
 fn main() {
     let rng = &mut OsRng {};
     let ring_size = 11; // 10 decoys
     let ring_layers = 2; // 2 inputs
     let secrets = (0..ring_layers)
-        .map(|_| scalar::random(rng).to_bytes())
+        .map(|_| Secret::new(rng))
         .collect::<Vec<_>>();
     let data_0 = b"hello";
     let data_1 = b"world";

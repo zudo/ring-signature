@@ -1,5 +1,6 @@
 use crate::point;
 use crate::scalar;
+use crate::Secret;
 use curve25519_dalek::constants;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
@@ -20,11 +21,11 @@ pub struct MLSAG {
 impl MLSAG {
     pub fn sign<Hash: Digest<OutputSize = U64> + Clone>(
         rng: &mut impl CryptoRngCore,
-        secret_keys: &Vec<[u8; 32]>,
+        secrets: &[Secret],
         rings: &Vec<Vec<[u8; 32]>>,
         message: impl AsRef<[u8]>,
     ) -> Option<MLSAG> {
-        let secret_scalars_0 = scalar::vec_1d::from_slice(secret_keys);
+        let secret_scalars_0 = secrets.iter().map(|x| x.0).collect::<Vec<_>>();
         let nr = rings.len() + 1;
         let nc = rings[0].len();
         let mut rings_0 = point::vec_2d::from_slice(rings)?;
@@ -164,7 +165,7 @@ mod test {
         let rng = &mut OsRng {};
         let nr = 2;
         let nc = 2;
-        let secret_keys: Vec<[u8; 32]> = (0..nc).map(|_| scalar::random(rng).to_bytes()).collect();
+        let secrets = (0..nc).map(|_| Secret::new(rng)).collect::<Vec<_>>();
         let ring: Vec<Vec<[u8; 32]>> = (0..(nr - 1))
             .map(|_| {
                 (0..nc)
@@ -173,7 +174,7 @@ mod test {
             })
             .collect();
         let message: Vec<u8> = b"This is the message".iter().cloned().collect();
-        let mlsag = MLSAG::sign::<Sha512>(rng, &secret_keys, &ring, &message).unwrap();
+        let mlsag = MLSAG::sign::<Sha512>(rng, &secrets, &ring, &message).unwrap();
         let result = mlsag.verify::<Sha512>(&message);
         assert!(result);
         let another_ring: Vec<Vec<[u8; 32]>> = (0..(nr - 1))
@@ -185,8 +186,8 @@ mod test {
             .collect();
         let another_message: Vec<u8> = b"This is another message".iter().cloned().collect();
         let mlsag_1 =
-            MLSAG::sign::<Sha512>(rng, &secret_keys, &another_ring, &another_message).unwrap();
-        let mlsag_2 = MLSAG::sign::<Sha512>(rng, &secret_keys, &ring, &message).unwrap();
+            MLSAG::sign::<Sha512>(rng, &secrets, &another_ring, &another_message).unwrap();
+        let mlsag_2 = MLSAG::sign::<Sha512>(rng, &secrets, &ring, &message).unwrap();
         let result = MLSAG::link(&[mlsag_1.key_images, mlsag_2.key_images]);
         assert!(result);
     }

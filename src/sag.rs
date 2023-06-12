@@ -1,5 +1,6 @@
 use crate::point;
 use crate::scalar;
+use crate::Secret;
 use curve25519_dalek::constants;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::traits::MultiscalarMul;
@@ -18,11 +19,11 @@ pub struct SAG {
 impl SAG {
     pub fn sign<Hash: Digest<OutputSize = U64> + Clone>(
         rng: &mut impl CryptoRngCore,
-        secret_key: &[u8; 32],
+        secret: &Secret,
         ring: &Vec<[u8; 32]>,
         data: impl AsRef<[u8]>,
     ) -> Option<SAG> {
-        let secret_scalar_0 = scalar::from_slice(secret_key);
+        let secret_scalar_0 = secret.0;
         let mut ring_0 = point::vec_1d::from_slice(ring)?;
         let secret_index = rng.gen_range(0..=ring_0.len());
         ring_0.insert(
@@ -102,11 +103,11 @@ pub mod test {
     #[test]
     fn sag() {
         let rng = &mut OsRng {};
-        let secret_key = scalar::random(rng).to_bytes();
+        let secret = Secret::new(rng);
         let data = b"hello world";
         for n in 2..11 {
             let ring = point::vec_1d::to_bytes(&point::vec_1d::random(n - 1));
-            let sag = SAG::sign::<Sha512>(rng, &secret_key, &ring, data).unwrap();
+            let sag = SAG::sign::<Sha512>(rng, &secret, &ring, data).unwrap();
             assert!((sag.verify::<Sha512>(data)));
         }
     }
