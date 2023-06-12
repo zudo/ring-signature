@@ -38,3 +38,39 @@ impl Secret {
         Secret(scalar::random(rng))
     }
 }
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Ring(Vec<RistrettoPoint>);
+impl Ring {
+    pub fn compress(&self) -> Vec<[u8; 32]> {
+        self.0.iter().map(|x| x.compress().to_bytes()).collect()
+    }
+    pub fn decompress(ring: &Vec<[u8; 32]>) -> Option<Ring> {
+        Some(Ring(
+            ring.iter()
+                .map(|x| point::from_slice(x))
+                .collect::<Option<Vec<_>>>()?,
+        ))
+    }
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Rings(Vec<Vec<RistrettoPoint>>);
+impl Rings {
+    pub fn compress(&self) -> Vec<Vec<[u8; 32]>> {
+        self.0
+            .iter()
+            .map(|x| x.iter().map(|y| y.compress().to_bytes()).collect())
+            .collect()
+    }
+    pub fn decompress(rings: &Vec<Vec<[u8; 32]>>) -> Option<Rings> {
+        Some(Rings(
+            rings
+                .iter()
+                .map(|x| {
+                    x.iter()
+                        .map(|y| point::from_slice(y))
+                        .collect::<Option<Vec<_>>>()
+                })
+                .collect::<Option<Vec<_>>>()?,
+        ))
+    }
+}

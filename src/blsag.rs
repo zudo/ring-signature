@@ -1,5 +1,6 @@
 use crate::point;
 use crate::scalar;
+use crate::Ring;
 use crate::Secret;
 use curve25519_dalek::constants;
 use curve25519_dalek::ristretto::RistrettoPoint;
@@ -22,12 +23,12 @@ impl BLSAG {
     pub fn sign<Hash: Digest<OutputSize = U64> + Clone>(
         rng: &mut impl CryptoRngCore,
         secret: &Secret,
-        ring: &Vec<[u8; 32]>,
+        ring: Ring,
         data: impl AsRef<[u8]>,
     ) -> Option<BLSAG> {
         let secret_scalar_0 = secret.0;
         let key_image = BLSAG::key_image::<Hash>(secret_scalar_0);
-        let mut ring_0 = point::vec_1d::from_slice(ring)?;
+        let mut ring_0 = ring.0;
         let secret_index = rng.gen_range(0..=ring_0.len());
         ring_0.insert(
             secret_index,
@@ -155,15 +156,18 @@ mod test {
         let data_0 = b"hello";
         let data_1 = b"world";
         for n in 2..11 {
-            let ring_0 = point::vec_1d::to_bytes(&point::vec_1d::random(n - 1));
-            let ring_1 = point::vec_1d::to_bytes(&point::vec_1d::random(n - 1));
-            let blsag_0 = BLSAG::sign::<Sha512>(rng, &secret_key_0, &ring_0, data_0).unwrap();
-            let blsag_1 = BLSAG::sign::<Sha512>(rng, &secret_key_0, &ring_1, data_1).unwrap();
+            let ring_0 =
+                Ring::decompress(&point::vec_1d::to_bytes(&point::vec_1d::random(n - 1))).unwrap();
+            let ring_1 =
+                Ring::decompress(&point::vec_1d::to_bytes(&point::vec_1d::random(n - 1))).unwrap();
+            let blsag_0 =
+                BLSAG::sign::<Sha512>(rng, &secret_key_0, ring_0.clone(), data_0).unwrap();
+            let blsag_1 = BLSAG::sign::<Sha512>(rng, &secret_key_0, ring_1, data_1).unwrap();
             assert!((blsag_0.verify::<Sha512>(data_0)));
             assert!((blsag_1.verify::<Sha512>(data_1)));
             assert!((BLSAG::link(&[blsag_0.key_image, blsag_1.key_image])));
             // since the key images are different, the signatures are not linked
-            let blsag_2 = BLSAG::sign::<Sha512>(rng, &secret_key_1, &ring_0, data_0).unwrap();
+            let blsag_2 = BLSAG::sign::<Sha512>(rng, &secret_key_1, ring_0, data_0).unwrap();
             assert!((blsag_2.verify::<Sha512>(data_0)));
             assert!(!(BLSAG::link(&[blsag_0.key_image, blsag_2.key_image])));
             assert!(!(BLSAG::link(&[blsag_1.key_image, blsag_2.key_image])));

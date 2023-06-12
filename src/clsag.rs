@@ -1,5 +1,6 @@
 use crate::point;
 use crate::scalar;
+use crate::Rings;
 use crate::Secret;
 use curve25519_dalek::constants;
 use curve25519_dalek::ristretto::RistrettoPoint;
@@ -22,12 +23,12 @@ impl CLSAG {
     pub fn sign<Hash: Digest<OutputSize = U64> + Clone>(
         rng: &mut impl CryptoRngCore,
         secrets: &[Secret],
-        rings: &Vec<Vec<[u8; 32]>>,
+        rings: Rings,
         data: impl AsRef<[u8]>,
     ) -> Option<CLSAG> {
         let secret_scalars = secrets.iter().map(|x| x.0).collect::<Vec<_>>();
         let key_images = CLSAG::key_image::<Hash>(&secret_scalars);
-        let mut rings = point::vec_2d::from_slice(rings)?;
+        let mut rings = rings.0;
         let public_points = secret_scalars
             .iter()
             .map(|x| x * constants::RISTRETTO_BASEPOINT_POINT)
@@ -256,6 +257,7 @@ impl CLSAG {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::Rings;
     use rand_core::OsRng;
     use sha2::Sha512;
     #[test]
@@ -268,10 +270,18 @@ mod test {
             .collect::<Vec<_>>();
         let data_0 = b"hello";
         let data_1 = b"world";
-        let ring_0 = point::vec_2d::to_bytes(&point::vec_2d::random(ring_size - 1, ring_layers));
-        let ring_1 = point::vec_2d::to_bytes(&point::vec_2d::random(ring_size - 1, ring_layers));
-        let blsag_0 = CLSAG::sign::<Sha512>(rng, &secrets, &ring_0, data_0).unwrap();
-        let blsag_1 = CLSAG::sign::<Sha512>(rng, &secrets, &ring_1, data_1).unwrap();
+        let ring_0 = Rings::decompress(&point::vec_2d::to_bytes(&point::vec_2d::random(
+            ring_size - 1,
+            ring_layers,
+        )))
+        .unwrap();
+        let ring_1 = Rings::decompress(&point::vec_2d::to_bytes(&point::vec_2d::random(
+            ring_size - 1,
+            ring_layers,
+        )))
+        .unwrap();
+        let blsag_0 = CLSAG::sign::<Sha512>(rng, &secrets, ring_0, data_0).unwrap();
+        let blsag_1 = CLSAG::sign::<Sha512>(rng, &secrets, ring_1, data_1).unwrap();
         assert!((blsag_0.verify::<Sha512>(data_0)));
         assert!((blsag_1.verify::<Sha512>(data_1)));
         println!("{:?}", blsag_0.key_images);
