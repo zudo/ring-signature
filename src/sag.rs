@@ -97,7 +97,7 @@ mod tests {
     use lazy_static::lazy_static;
     use rand_core::OsRng;
     use sha2::Sha512;
-    const DATA: &[u8] = b"hello from";
+    const DATA: &[u8] = b"hello from zudo";
     const X: usize = 2;
     lazy_static! {
         static ref SECRET_0: Secret = Secret::new(&mut OsRng {});
