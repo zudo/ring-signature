@@ -127,7 +127,7 @@ impl Image {
     pub fn new<Hash: Digest<OutputSize = U64>>(secret: &Secret) -> Image {
         let a = secret.0 * RISTRETTO_BASEPOINT_POINT;
         let b = point::hash::<Hash>(a);
-        Image(b)
+        Image(secret.0 * b)
     }
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
