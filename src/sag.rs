@@ -68,33 +68,29 @@ impl SAG {
         })
     }
     pub fn verify<Hash: Digest<OutputSize = U64> + Clone>(&self, data: impl AsRef<[u8]>) -> bool {
-        let hash = Hash::new().chain_update(data);
-        let challenge_0 = match scalar::from_canonical(self.challenge) {
+        match || -> Option<bool> {
+            let hash = Hash::new().chain_update(data);
+            let challenge_0 = scalar::from_canonical(self.challenge)?;
+            let mut challenge_1 = challenge_0;
+            let responses = ScalarVec::from_canonical(&self.responses)?;
+            let ring = PointVec::decompress(&self.ring)?;
+            for i in 0..self.ring.len() {
+                let mut hash = hash.clone();
+                hash.update(
+                    RistrettoPoint::multiscalar_mul(
+                        &[responses.0[i], challenge_1],
+                        &[constants::RISTRETTO_BASEPOINT_POINT, ring.0[i]],
+                    )
+                    .compress()
+                    .as_bytes(),
+                );
+                challenge_1 = scalar::from_hash(hash);
+            }
+            Some(challenge_0 == challenge_1)
+        }() {
             Some(x) => x,
-            None => return false,
-        };
-        let mut challenge_1 = challenge_0;
-        let responses = match ScalarVec::from_canonical(&self.responses) {
-            Some(x) => x,
-            None => return false,
-        };
-        let ring = match PointVec::decompress(&self.ring) {
-            Some(x) => x,
-            None => return false,
-        };
-        for i in 0..self.ring.len() {
-            let mut hash = hash.clone();
-            hash.update(
-                RistrettoPoint::multiscalar_mul(
-                    &[responses.0[i], challenge_1],
-                    &[constants::RISTRETTO_BASEPOINT_POINT, ring.0[i]],
-                )
-                .compress()
-                .as_bytes(),
-            );
-            challenge_1 = scalar::from_hash(hash);
+            None => false,
         }
-        challenge_0 == challenge_1
     }
 }
 #[cfg(test)]

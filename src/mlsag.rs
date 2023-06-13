@@ -97,49 +97,42 @@ impl MLSAG {
         })
     }
     pub fn verify<Hash: Digest<OutputSize = U64> + Clone>(&self, message: &Vec<u8>) -> bool {
-        let rings = match PointVec2D::decompress(&self.ring) {
-            Some(x) => x,
-            None => return false,
-        };
-        let key_images = match KeyImageVec::decompress(&self.key_images) {
-            Some(x) => x,
-            None => return false,
-        };
-        let responses = match ScalarVec2D::from_canonical(&self.responses) {
-            Some(x) => x,
-            None => return false,
-        };
-        let challenge_0 = match scalar::from_canonical(self.challenge) {
-            Some(x) => x,
-            None => return false,
-        };
-        let mut challenge_1 = challenge_0;
-        let nr = self.ring.len();
-        let nc = self.ring[0].len();
-        for i in 0..nr {
-            let mut hash = Hash::new();
-            hash.update(message);
-            for j in 0..nc {
-                hash.update(
-                    RistrettoPoint::multiscalar_mul(
-                        &[responses.0[i][j], challenge_1],
-                        &[constants::RISTRETTO_BASEPOINT_POINT, rings.0[i][j]],
-                    )
-                    .compress()
-                    .as_bytes(),
-                );
-                hash.update(
-                    RistrettoPoint::multiscalar_mul(
-                        &[responses.0[i][j], challenge_1],
-                        &[point::hash::<Hash>(rings.0[i][j]), key_images.0[j]],
-                    )
-                    .compress()
-                    .as_bytes(),
-                );
+        match || -> Option<bool> {
+            let rings = PointVec2D::decompress(&self.ring)?;
+            let key_images = KeyImageVec::decompress(&self.key_images)?;
+            let responses = ScalarVec2D::from_canonical(&self.responses)?;
+            let challenge_0 = scalar::from_canonical(self.challenge)?;
+            let mut challenge_1 = challenge_0;
+            let nr = self.ring.len();
+            let nc = self.ring[0].len();
+            for i in 0..nr {
+                let mut hash = Hash::new();
+                hash.update(message);
+                for j in 0..nc {
+                    hash.update(
+                        RistrettoPoint::multiscalar_mul(
+                            &[responses.0[i][j], challenge_1],
+                            &[constants::RISTRETTO_BASEPOINT_POINT, rings.0[i][j]],
+                        )
+                        .compress()
+                        .as_bytes(),
+                    );
+                    hash.update(
+                        RistrettoPoint::multiscalar_mul(
+                            &[responses.0[i][j], challenge_1],
+                            &[point::hash::<Hash>(rings.0[i][j]), key_images.0[j]],
+                        )
+                        .compress()
+                        .as_bytes(),
+                    );
+                }
+                challenge_1 = scalar::from_hash(hash);
             }
-            challenge_1 = scalar::from_hash(hash);
+            Some(challenge_0 == challenge_1)
+        }() {
+            Some(x) => x,
+            None => return false,
         }
-        challenge_0 == challenge_1
     }
     pub fn image<Hash: Digest<OutputSize = U64>>(secrets: &[Secret]) -> KeyImageVec {
         let nc = secrets.len();

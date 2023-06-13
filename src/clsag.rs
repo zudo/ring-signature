@@ -121,65 +121,58 @@ impl CLSAG {
         })
     }
     pub fn verify<Hash: Digest<OutputSize = U64> + Clone>(&self, data: impl AsRef<[u8]>) -> bool {
-        let ring_size = self.rings.len();
-        let ring_layers = self.rings[0].len();
-        let rings = match PointVec2D::decompress(&self.rings) {
-            Some(x) => x,
-            None => return false,
-        };
-        let key_images = match KeyImageVec::decompress(&self.key_images) {
-            Some(x) => x,
-            None => return false,
-        };
-        let responses = match ScalarVec::from_canonical(&self.responses) {
-            Some(x) => x,
-            None => return false,
-        };
-        let challenge_0 = match scalar::from_canonical(self.challenge) {
-            Some(x) => x,
-            None => return false,
-        };
-        let mut challenge_1 = challenge_0;
-        let prefixed_hashes_with_key_images =
-            CLSAG::prefixed_hashes_with_key_images::<Hash>(&rings, &key_images);
-        let aggregate_public_keys =
-            CLSAG::aggregate_public_keys(&rings, &prefixed_hashes_with_key_images);
-        let aggregate_key_image = CLSAG::aggregate_key_image::<Hash>(
-            &rings,
-            &prefixed_hashes_with_key_images,
-            &key_images,
-        );
-        for i in 0..ring_size {
-            let mut hash: Hash = Hash::new();
-            hash.update(format!("CLSAG_c"));
-            for j in 0..ring_size {
-                for k in 0..ring_layers {
-                    hash.update(rings.0[j][k].compress().as_bytes());
+        match || -> Option<bool> {
+            let ring_size = self.rings.len();
+            let ring_layers = self.rings[0].len();
+            let rings = PointVec2D::decompress(&self.rings)?;
+            let key_images = KeyImageVec::decompress(&self.key_images)?;
+            let responses = ScalarVec::from_canonical(&self.responses)?;
+            let challenge_0 = scalar::from_canonical(self.challenge)?;
+            let mut challenge_1 = challenge_0;
+            let prefixed_hashes_with_key_images =
+                CLSAG::prefixed_hashes_with_key_images::<Hash>(&rings, &key_images);
+            let aggregate_public_keys =
+                CLSAG::aggregate_public_keys(&rings, &prefixed_hashes_with_key_images);
+            let aggregate_key_image = CLSAG::aggregate_key_image::<Hash>(
+                &rings,
+                &prefixed_hashes_with_key_images,
+                &key_images,
+            );
+            for i in 0..ring_size {
+                let mut hash: Hash = Hash::new();
+                hash.update(format!("CLSAG_c"));
+                for j in 0..ring_size {
+                    for k in 0..ring_layers {
+                        hash.update(rings.0[j][k].compress().as_bytes());
+                    }
                 }
+                hash.update(&data);
+                hash.update(
+                    RistrettoPoint::multiscalar_mul(
+                        &[responses.0[i], challenge_1],
+                        &[
+                            constants::RISTRETTO_BASEPOINT_POINT,
+                            aggregate_public_keys[i],
+                        ],
+                    )
+                    .compress()
+                    .as_bytes(),
+                );
+                hash.update(
+                    RistrettoPoint::multiscalar_mul(
+                        &[responses.0[i], challenge_1],
+                        &[point::hash::<Hash>(rings.0[i][0]), aggregate_key_image],
+                    )
+                    .compress()
+                    .as_bytes(),
+                );
+                challenge_1 = scalar::from_hash(hash);
             }
-            hash.update(&data);
-            hash.update(
-                RistrettoPoint::multiscalar_mul(
-                    &[responses.0[i], challenge_1],
-                    &[
-                        constants::RISTRETTO_BASEPOINT_POINT,
-                        aggregate_public_keys[i],
-                    ],
-                )
-                .compress()
-                .as_bytes(),
-            );
-            hash.update(
-                RistrettoPoint::multiscalar_mul(
-                    &[responses.0[i], challenge_1],
-                    &[point::hash::<Hash>(rings.0[i][0]), aggregate_key_image],
-                )
-                .compress()
-                .as_bytes(),
-            );
-            challenge_1 = scalar::from_hash(hash);
+            Some(challenge_0 == challenge_1)
+        }() {
+            Some(x) => x,
+            None => false,
         }
-        challenge_0 == challenge_1
     }
     pub fn link(key_images: &[&[[u8; 32]]]) -> bool {
         if key_images.is_empty() || key_images[0].is_empty() {
