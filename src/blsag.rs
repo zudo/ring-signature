@@ -16,7 +16,7 @@ use serde::Serialize;
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct BLSAG {
     pub challenge: [u8; 32],
-    pub responses: Vec<[u8; 32]>,
+    pub response: Vec<[u8; 32]>,
     pub ring: Vec<[u8; 32]>,
     pub image: [u8; 32],
 }
@@ -50,12 +50,12 @@ impl BLSAG {
         );
         let mut challenges = vec![scalar::zero(); ring_size];
         challenges[current_index] = scalar::from_hash(hashes[current_index].clone());
-        let mut responses = Response::random(rng, ring_size);
+        let mut response = Response::random(rng, ring_size);
         loop {
             let next_index = (current_index + 1) % ring_size;
             hashes[next_index].update(
                 RistrettoPoint::multiscalar_mul(
-                    &[responses.0[current_index], challenges[current_index]],
+                    &[response.0[current_index], challenges[current_index]],
                     &[constants::RISTRETTO_BASEPOINT_POINT, ring.0[current_index]],
                 )
                 .compress()
@@ -63,7 +63,7 @@ impl BLSAG {
             );
             hashes[next_index].update(
                 RistrettoPoint::multiscalar_mul(
-                    &[responses.0[current_index], challenges[current_index]],
+                    &[response.0[current_index], challenges[current_index]],
                     &[point::hash::<Hash>(ring.0[current_index]), image.0],
                 )
                 .compress()
@@ -77,10 +77,10 @@ impl BLSAG {
             }
             current_index = next_index;
         }
-        responses.0[secret_index] = secret_scalar_1 - (challenges[secret_index] * secret.0);
+        response.0[secret_index] = secret_scalar_1 - (challenges[secret_index] * secret.0);
         Some(BLSAG {
             challenge: challenges[0].to_bytes(),
-            responses: responses.to_bytes(),
+            response: response.to_bytes(),
             ring: ring.compress(),
             image: image.compress(),
         })
@@ -90,14 +90,14 @@ impl BLSAG {
             let hash = Hash::new().chain_update(data);
             let challenge_0 = scalar::from_canonical(self.challenge)?;
             let mut challenge_1 = challenge_0;
-            let responses = Response::from_canonical(&self.responses)?;
+            let response = Response::from_canonical(&self.response)?;
             let ring = Ring::decompress(&self.ring)?;
             let image = Image::decompress(&self.image)?;
             for i in 0..self.ring.len() {
                 let mut hash = hash.clone();
                 hash.update(
                     RistrettoPoint::multiscalar_mul(
-                        &[responses.0[i], challenge_1],
+                        &[response.0[i], challenge_1],
                         &[constants::RISTRETTO_BASEPOINT_POINT, ring.0[i]],
                     )
                     .compress()
@@ -105,7 +105,7 @@ impl BLSAG {
                 );
                 hash.update(
                     RistrettoPoint::multiscalar_mul(
-                        &[responses.0[i], challenge_1],
+                        &[response.0[i], challenge_1],
                         &[
                             point::from_hash(Hash::new().chain_update(self.ring[i])),
                             image.0,
