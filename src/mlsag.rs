@@ -146,7 +146,7 @@ impl MLSAG {
                 .collect(),
         )
     }
-    pub fn link(images: &[Vec<[u8; 32]>]) -> bool {
+    pub fn link(images: &[&[[u8; 32]]]) -> bool {
         if images.is_empty() || images[0].is_empty() {
             return false;
         }
@@ -184,7 +184,7 @@ mod tests {
         let mlsag_1 =
             MLSAG::sign::<Sha512>(rng, &secrets, another_rings, &another_message).unwrap();
         let mlsag_2 = MLSAG::sign::<Sha512>(rng, &secrets, rings, &message).unwrap();
-        let result = MLSAG::link(&[mlsag_1.images, mlsag_2.images]);
+        let result = MLSAG::link(&[&mlsag_1.images, &mlsag_2.images]);
         assert!(result);
     }
 }
