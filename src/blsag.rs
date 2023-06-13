@@ -5,7 +5,6 @@ use crate::ScalarVec;
 use crate::Secret;
 use curve25519_dalek::constants;
 use curve25519_dalek::ristretto::RistrettoPoint;
-use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::MultiscalarMul;
 use digest::generic_array::typenum::U64;
 use digest::Digest;
@@ -27,7 +26,7 @@ impl BLSAG {
         mut ring: PointVec,
         data: impl AsRef<[u8]>,
     ) -> Option<BLSAG> {
-        let key_image = BLSAG::key_image::<Hash>(secret.0);
+        let key_image = BLSAG::key_image::<Hash>(&secret);
         let secret_index = rng.gen_range(0..=ring.0.len());
         ring.0.insert(
             secret_index,
@@ -129,15 +128,9 @@ impl BLSAG {
         }
         challenge_0 == challenge_1
     }
-    pub fn key_image<Hash: Digest<OutputSize = U64>>(secret_key: Scalar) -> RistrettoPoint {
-        secret_key
-            * point::from_hash(
-                Hash::new().chain_update(
-                    (secret_key * constants::RISTRETTO_BASEPOINT_POINT)
-                        .compress()
-                        .as_bytes(),
-                ),
-            )
+    pub fn key_image<Hash: Digest<OutputSize = U64>>(secret: &Secret) -> RistrettoPoint {
+        let a = secret.0 * constants::RISTRETTO_BASEPOINT_POINT;
+        point::hash::<Hash>(a)
     }
     pub fn link(key_images: &[[u8; 32]]) -> bool {
         if key_images.is_empty() {
