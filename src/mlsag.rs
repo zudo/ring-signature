@@ -104,8 +104,14 @@ impl MLSAG {
             Some(x) => x,
             None => return false,
         };
-        let responses = scalar::vec_2d::from_slice(&self.responses);
-        let challenge_0 = scalar::from_slice(&self.challenge);
+        let responses = match Responses2d::from_canonical(&self.responses) {
+            Some(x) => x,
+            None => return false,
+        };
+        let challenge_0 = match scalar::from_canonical(self.challenge) {
+            Some(x) => x,
+            None => return false,
+        };
         let mut challenge_1 = challenge_0;
         let nr = self.ring.len();
         let nc = self.ring[0].len();
@@ -115,7 +121,7 @@ impl MLSAG {
             for j in 0..nc {
                 hash.update(
                     RistrettoPoint::multiscalar_mul(
-                        &[responses[i][j], challenge_1],
+                        &[responses.0[i][j], challenge_1],
                         &[constants::RISTRETTO_BASEPOINT_POINT, rings.0[i][j]],
                     )
                     .compress()
@@ -123,7 +129,7 @@ impl MLSAG {
                 );
                 hash.update(
                     RistrettoPoint::multiscalar_mul(
-                        &[responses[i][j], challenge_1],
+                        &[responses.0[i][j], challenge_1],
                         &[point::hash::<Hash>(rings.0[i][j]), key_images.0[j]],
                     )
                     .compress()

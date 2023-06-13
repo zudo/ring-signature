@@ -16,9 +16,6 @@ pub fn zero() -> Scalar {
 pub fn from_hash<Hash: Digest<OutputSize = U64>>(hash: Hash) -> Scalar {
     Scalar::from_bytes_mod_order_wide(&hash.finalize().into())
 }
-pub fn from_slice(bytes: &[u8; 32]) -> Scalar {
-    Scalar::from_bytes_mod_order(*bytes)
-}
 pub mod vec_1d {
     use curve25519_dalek::Scalar;
     use rand_core::CryptoRngCore;
@@ -28,16 +25,10 @@ pub mod vec_1d {
     pub fn to_bytes(ring: &Vec<Scalar>) -> Vec<[u8; 32]> {
         ring.iter().map(|x| x.to_bytes()).collect()
     }
-    pub fn from_slice(ring: &Vec<[u8; 32]>) -> Vec<Scalar> {
-        ring.iter().map(super::from_slice).collect::<Vec<_>>()
-    }
 }
 pub mod vec_2d {
     use curve25519_dalek::Scalar;
     pub fn to_bytes(vec: &Vec<Vec<Scalar>>) -> Vec<Vec<[u8; 32]>> {
         vec.iter().map(super::vec_1d::to_bytes).collect()
-    }
-    pub fn from_slice(vec: &Vec<Vec<[u8; 32]>>) -> Vec<Vec<Scalar>> {
-        vec.iter().map(super::vec_1d::from_slice).collect()
     }
 }

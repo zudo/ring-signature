@@ -89,7 +89,10 @@ impl BLSAG {
     }
     pub fn verify<Hash: Digest<OutputSize = U64> + Clone>(&self, data: impl AsRef<[u8]>) -> bool {
         let hash = Hash::new().chain_update(data);
-        let challenge_0 = scalar::from_slice(&self.challenge);
+        let challenge_0 = match scalar::from_canonical(self.challenge) {
+            Some(x) => x,
+            None => return false,
+        };
         let mut challenge_1 = challenge_0;
         let responses = match Responses::from_canonical(&self.responses) {
             Some(x) => x,

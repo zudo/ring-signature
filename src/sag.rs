@@ -1,4 +1,5 @@
 use crate::scalar;
+use crate::Responses;
 use crate::Ring;
 use crate::Secret;
 use curve25519_dalek::constants;
@@ -70,9 +71,15 @@ impl SAG {
     }
     pub fn verify<Hash: Digest<OutputSize = U64> + Clone>(&self, data: impl AsRef<[u8]>) -> bool {
         let hash = Hash::new().chain_update(data);
-        let challenge_0 = scalar::from_slice(&self.challenge);
+        let challenge_0 = match scalar::from_canonical(self.challenge) {
+            Some(x) => x,
+            None => return false,
+        };
         let mut challenge_1 = challenge_0;
-        let responses = scalar::vec_1d::from_slice(&self.responses);
+        let responses = match Responses::from_canonical(&self.responses) {
+            Some(x) => x,
+            None => return false,
+        };
         let ring = match Ring::decompress(&self.ring) {
             Some(x) => x,
             None => return false,
@@ -81,7 +88,7 @@ impl SAG {
             let mut hash = hash.clone();
             hash.update(
                 RistrettoPoint::multiscalar_mul(
-                    &[responses[i], challenge_1],
+                    &[responses.0[i], challenge_1],
                     &[constants::RISTRETTO_BASEPOINT_POINT, ring.0[i]],
                 )
                 .compress()

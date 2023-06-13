@@ -131,8 +131,14 @@ impl CLSAG {
             Some(x) => x,
             None => return false,
         };
-        let responses = scalar::vec_1d::from_slice(&self.responses);
-        let challenge_0 = scalar::from_slice(&self.challenge);
+        let responses = match Responses::from_canonical(&self.responses) {
+            Some(x) => x,
+            None => return false,
+        };
+        let challenge_0 = match scalar::from_canonical(self.challenge) {
+            Some(x) => x,
+            None => return false,
+        };
         let mut challenge_1 = challenge_0;
         let prefixed_hashes_with_key_images =
             CLSAG::prefixed_hashes_with_key_images::<Hash>(&rings, &key_images);
@@ -154,7 +160,7 @@ impl CLSAG {
             hash.update(&data);
             hash.update(
                 RistrettoPoint::multiscalar_mul(
-                    &[responses[i], challenge_1],
+                    &[responses.0[i], challenge_1],
                     &[
                         constants::RISTRETTO_BASEPOINT_POINT,
                         aggregate_public_keys[i],
@@ -165,7 +171,7 @@ impl CLSAG {
             );
             hash.update(
                 RistrettoPoint::multiscalar_mul(
-                    &[responses[i], challenge_1],
+                    &[responses.0[i], challenge_1],
                     &[point::hash::<Hash>(rings.0[i][0]), aggregate_key_image],
                 )
                 .compress()
