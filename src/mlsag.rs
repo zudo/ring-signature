@@ -1,8 +1,8 @@
 use crate::point;
 use crate::scalar;
 use crate::Images;
+use crate::Responses;
 use crate::Rings;
-use crate::ScalarVec2D;
 use crate::Secret;
 use curve25519_dalek::constants;
 use curve25519_dalek::ristretto::RistrettoPoint;
@@ -38,7 +38,7 @@ impl MLSAG {
         let secret_index = rng.gen_range(0..nr);
         rings.0.insert(secret_index, k_points.clone());
         let a: Vec<Scalar> = (0..nc).map(|_| scalar::random(rng)).collect();
-        let mut responses = ScalarVec2D::random(rng, nr, nc);
+        let mut responses = Responses::random(rng, nr, nc);
         let mut challenges: Vec<Scalar> = (0..nr).map(|_| scalar::zero()).collect();
         let mut hash = Hash::new();
         hash.update(message);
@@ -100,7 +100,7 @@ impl MLSAG {
         match || -> Option<bool> {
             let rings = Rings::decompress(&self.ring)?;
             let images = Images::decompress(&self.images)?;
-            let responses = ScalarVec2D::from_canonical(&self.responses)?;
+            let responses = Responses::from_canonical(&self.responses)?;
             let challenge_0 = scalar::from_canonical(self.challenge)?;
             let mut challenge_1 = challenge_0;
             let nr = self.ring.len();

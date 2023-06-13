@@ -1,6 +1,6 @@
 use crate::scalar;
+use crate::Response;
 use crate::Ring;
-use crate::ScalarVec;
 use crate::Secret;
 use curve25519_dalek::constants;
 use curve25519_dalek::ristretto::RistrettoPoint;
@@ -41,7 +41,7 @@ impl SAG {
         );
         let mut challenges = vec![scalar::zero(); ring_size];
         challenges[current_index] = scalar::from_hash(hashes[current_index].clone());
-        let mut responses = ScalarVec::random(rng, ring_size);
+        let mut responses = Response::random(rng, ring_size);
         loop {
             let next_index = (current_index + 1) % ring_size;
             hashes[next_index].update(
@@ -72,7 +72,7 @@ impl SAG {
             let hash = Hash::new().chain_update(data);
             let challenge_0 = scalar::from_canonical(self.challenge)?;
             let mut challenge_1 = challenge_0;
-            let responses = ScalarVec::from_canonical(&self.responses)?;
+            let responses = Response::from_canonical(&self.responses)?;
             let ring = Ring::decompress(&self.ring)?;
             for i in 0..self.ring.len() {
                 let mut hash = hash.clone();
