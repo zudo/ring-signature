@@ -28,33 +28,33 @@ impl Secret {
     }
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct PointVec(Vec<RistrettoPoint>);
-impl PointVec {
+pub struct Ring(Vec<RistrettoPoint>);
+impl Ring {
     pub fn compress(&self) -> Vec<[u8; 32]> {
         self.0.iter().map(|x| x.compress().to_bytes()).collect()
     }
-    pub fn decompress(vec: &Vec<[u8; 32]>) -> Option<PointVec> {
-        Some(PointVec(
+    pub fn decompress(vec: &Vec<[u8; 32]>) -> Option<Ring> {
+        Some(Ring(
             vec.iter()
                 .map(|x| point::from_slice(x))
                 .collect::<Option<Vec<_>>>()?,
         ))
     }
-    pub fn random(x: usize) -> PointVec {
-        PointVec((0..x).map(|_| point::random()).collect())
+    pub fn random(x: usize) -> Ring {
+        Ring((0..x).map(|_| point::random()).collect())
     }
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct PointVec2D(Vec<Vec<RistrettoPoint>>);
-impl PointVec2D {
+pub struct Rings(Vec<Vec<RistrettoPoint>>);
+impl Rings {
     pub fn compress(&self) -> Vec<Vec<[u8; 32]>> {
         self.0
             .iter()
             .map(|x| x.iter().map(|y| y.compress().to_bytes()).collect())
             .collect()
     }
-    pub fn decompress(vec_2d: &Vec<Vec<[u8; 32]>>) -> Option<PointVec2D> {
-        Some(PointVec2D(
+    pub fn decompress(vec_2d: &Vec<Vec<[u8; 32]>>) -> Option<Rings> {
+        Some(Rings(
             vec_2d
                 .iter()
                 .map(|x| {
@@ -65,8 +65,8 @@ impl PointVec2D {
                 .collect::<Option<Vec<_>>>()?,
         ))
     }
-    pub fn random(x: usize, y: usize) -> PointVec2D {
-        PointVec2D(
+    pub fn random(x: usize, y: usize) -> Rings {
+        Rings(
             (0..x)
                 .map(|_| (0..y).map(|_| point::random()).collect())
                 .collect(),
@@ -131,22 +131,22 @@ impl Image {
     }
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ImageVec(Vec<RistrettoPoint>);
-impl ImageVec {
+pub struct Images(Vec<RistrettoPoint>);
+impl Images {
     pub fn compress(&self) -> Vec<[u8; 32]> {
         self.0.iter().map(|x| x.compress().to_bytes()).collect()
     }
-    pub fn decompress(bytes: &Vec<[u8; 32]>) -> Option<ImageVec> {
-        Some(ImageVec(
+    pub fn decompress(bytes: &Vec<[u8; 32]>) -> Option<Images> {
+        Some(Images(
             bytes
                 .iter()
                 .map(|x| point::from_slice(x))
                 .collect::<Option<Vec<_>>>()?,
         ))
     }
-    pub fn new<Hash: Digest<OutputSize = U64>>(secrets: &[Secret]) -> ImageVec {
+    pub fn new<Hash: Digest<OutputSize = U64>>(secrets: &[Secret]) -> Images {
         let a = secrets[0].0 * RISTRETTO_BASEPOINT_POINT;
         let b = point::hash::<Hash>(a);
-        ImageVec(secrets.iter().map(|x| x.0 * b).collect())
+        Images(secrets.iter().map(|x| x.0 * b).collect())
     }
 }

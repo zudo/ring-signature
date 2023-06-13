@@ -1,5 +1,5 @@
 use crate::scalar;
-use crate::PointVec;
+use crate::Ring;
 use crate::ScalarVec;
 use crate::Secret;
 use curve25519_dalek::constants;
@@ -21,7 +21,7 @@ impl SAG {
     pub fn sign<Hash: Digest<OutputSize = U64> + Clone>(
         rng: &mut impl CryptoRngCore,
         secret: &Secret,
-        mut ring: PointVec,
+        mut ring: Ring,
         data: impl AsRef<[u8]>,
     ) -> Option<SAG> {
         let secret_index = rng.gen_range(0..=ring.0.len());
@@ -73,7 +73,7 @@ impl SAG {
             let challenge_0 = scalar::from_canonical(self.challenge)?;
             let mut challenge_1 = challenge_0;
             let responses = ScalarVec::from_canonical(&self.responses)?;
-            let ring = PointVec::decompress(&self.ring)?;
+            let ring = Ring::decompress(&self.ring)?;
             for i in 0..self.ring.len() {
                 let mut hash = hash.clone();
                 hash.update(
@@ -104,7 +104,7 @@ pub mod tests {
         let secret = Secret::new(rng);
         let data = b"hello world";
         for n in 2..11 {
-            let ring = PointVec::random(n - 1);
+            let ring = Ring::random(n - 1);
             let sag = SAG::sign::<Sha512>(rng, &secret, ring, data).unwrap();
             assert!((sag.verify::<Sha512>(data)));
         }
