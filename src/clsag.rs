@@ -255,10 +255,12 @@ mod tests {
         let rng = &mut OsRng {};
         let a = CLSAG::sign::<Sha512>(rng, &SECRETS_0, RINGS_0.clone(), DATA_0).unwrap();
         let b = CLSAG::sign::<Sha512>(rng, &SECRETS_0, RINGS_1.clone(), DATA_0).unwrap();
-        let c = CLSAG::sign::<Sha512>(rng, &SECRETS_1, RINGS_1.clone(), DATA_0).unwrap();
+        let c = CLSAG::sign::<Sha512>(rng, &SECRETS_1, RINGS_0.clone(), DATA_0).unwrap();
+        let d = CLSAG::sign::<Sha512>(rng, &SECRETS_1, RINGS_1.clone(), DATA_0).unwrap();
         assert!((a.verify::<Sha512>(DATA_0)));
         assert!((b.verify::<Sha512>(DATA_0)));
         assert!((c.verify::<Sha512>(DATA_0)));
+        assert!((d.verify::<Sha512>(DATA_0)));
     }
     #[test]
     fn link() {

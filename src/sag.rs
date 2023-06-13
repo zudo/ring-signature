@@ -92,19 +92,29 @@ impl SAG {
     }
 }
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::*;
+    use lazy_static::lazy_static;
     use rand_core::OsRng;
     use sha2::Sha512;
+    const DATA: &[u8] = b"hello from";
+    const X: usize = 2;
+    lazy_static! {
+        static ref SECRET_0: Secret = Secret::new(&mut OsRng {});
+        static ref SECRET_1: Secret = Secret::new(&mut OsRng {});
+        static ref RING_0: Ring = Ring::random(X);
+        static ref RING_1: Ring = Ring::random(X);
+    }
     #[test]
     fn sign_verify() {
         let rng = &mut OsRng {};
-        let secret = Secret::new(rng);
-        let data = b"hello world";
-        for n in 2..11 {
-            let ring = Ring::random(n - 1);
-            let sag = SAG::sign::<Sha512>(rng, &secret, ring, data).unwrap();
-            assert!((sag.verify::<Sha512>(data)));
-        }
+        let a = SAG::sign::<Sha512>(rng, &SECRET_0, RING_0.clone(), DATA).unwrap();
+        let b = SAG::sign::<Sha512>(rng, &SECRET_0, RING_1.clone(), DATA).unwrap();
+        let c = SAG::sign::<Sha512>(rng, &SECRET_1, RING_0.clone(), DATA).unwrap();
+        let d = SAG::sign::<Sha512>(rng, &SECRET_1, RING_1.clone(), DATA).unwrap();
+        assert!((a.verify::<Sha512>(DATA)));
+        assert!((b.verify::<Sha512>(DATA)));
+        assert!((c.verify::<Sha512>(DATA)));
+        assert!((d.verify::<Sha512>(DATA)));
     }
 }

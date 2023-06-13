@@ -93,7 +93,7 @@ impl MLSAG {
             images: images.compress(),
         })
     }
-    pub fn verify<Hash: Digest<OutputSize = U64> + Clone>(&self, message: &Vec<u8>) -> bool {
+    pub fn verify<Hash: Digest<OutputSize = U64> + Clone>(&self, data: impl AsRef<[u8]>) -> bool {
         match || -> Option<bool> {
             let rings = Rings::decompress(&self.ring)?;
             let images = Images::decompress(&self.images)?;
@@ -104,7 +104,7 @@ impl MLSAG {
             let nc = self.ring[0].len();
             for i in 0..nr {
                 let mut hash = Hash::new();
-                hash.update(message);
+                hash.update(&data);
                 for j in 0..nc {
                     hash.update(
                         RistrettoPoint::multiscalar_mul(
@@ -156,32 +156,45 @@ impl MLSAG {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Rings;
+    use lazy_static::lazy_static;
     use rand_core::OsRng;
     use sha2::Sha512;
+    const DATA_0: &[u8] = b"hello from";
+    const DATA_1: &str = "zudo";
+    const X: usize = 2;
+    const Y: usize = 2;
+    lazy_static! {
+        static ref SECRETS_0: Vec<Secret> = (0..Y).map(|_| Secret::new(&mut OsRng {})).collect();
+        static ref SECRETS_1: Vec<Secret> = (0..Y).map(|_| Secret::new(&mut OsRng {})).collect();
+        static ref RINGS_0: Rings = Rings::random(X, Y);
+        static ref RINGS_1: Rings = Rings::random(X, Y);
+    }
     #[test]
     fn sign_verify() {
         let rng = &mut OsRng {};
-        let nr = 2;
-        let nc = 2;
-        let secrets = (0..nc).map(|_| Secret::new(rng)).collect::<Vec<_>>();
-        let rings = Rings::random(nr - 1, nc);
-        let message: Vec<u8> = b"This is the message".iter().cloned().collect();
-        let mlsag = MLSAG::sign::<Sha512>(rng, &secrets, rings.clone(), &message).unwrap();
-        let result = mlsag.verify::<Sha512>(&message);
-        assert!(result);
-        let another_rings: Vec<Vec<[u8; 32]>> = (0..(nr - 1))
-            .map(|_| {
-                (0..nc)
-                    .map(|_| point::random().compress().to_bytes())
-                    .collect()
-            })
-            .collect();
-        let another_rings = Rings::decompress(&another_rings).unwrap();
-        let another_message: Vec<u8> = b"This is another message".iter().cloned().collect();
-        let mlsag_1 =
-            MLSAG::sign::<Sha512>(rng, &secrets, another_rings, &another_message).unwrap();
-        let mlsag_2 = MLSAG::sign::<Sha512>(rng, &secrets, rings, &message).unwrap();
-        let result = MLSAG::link(&[&mlsag_1.images, &mlsag_2.images]);
-        assert!(result);
+        let a = MLSAG::sign::<Sha512>(rng, &SECRETS_0, RINGS_0.clone(), DATA_0).unwrap();
+        let b = MLSAG::sign::<Sha512>(rng, &SECRETS_0, RINGS_1.clone(), DATA_0).unwrap();
+        let c = MLSAG::sign::<Sha512>(rng, &SECRETS_1, RINGS_0.clone(), DATA_0).unwrap();
+        let d = MLSAG::sign::<Sha512>(rng, &SECRETS_1, RINGS_1.clone(), DATA_0).unwrap();
+        assert!((a.verify::<Sha512>(DATA_0)));
+        assert!((b.verify::<Sha512>(DATA_0)));
+        assert!((c.verify::<Sha512>(DATA_0)));
+        assert!((d.verify::<Sha512>(DATA_0)));
+    }
+    #[test]
+    fn link() {
+        let rng = &mut OsRng {};
+        let a = MLSAG::sign::<Sha512>(rng, &SECRETS_0, RINGS_0.clone(), DATA_1).unwrap();
+        let b = MLSAG::sign::<Sha512>(rng, &SECRETS_0, RINGS_1.clone(), DATA_0).unwrap();
+        let c = MLSAG::sign::<Sha512>(rng, &SECRETS_1, RINGS_0.clone(), DATA_0).unwrap();
+        let d = MLSAG::sign::<Sha512>(rng, &SECRETS_0, RINGS_1.clone(), DATA_1).unwrap();
+        let e = MLSAG::sign::<Sha512>(rng, &SECRETS_1, RINGS_0.clone(), DATA_1).unwrap();
+        let f = MLSAG::sign::<Sha512>(rng, &SECRETS_1, RINGS_1.clone(), DATA_1).unwrap();
+        assert!((MLSAG::link(&[&a.images, &b.images])));
+        assert!((!MLSAG::link(&[&a.images, &c.images])));
+        assert!((MLSAG::link(&[&a.images, &d.images])));
+        assert!((!MLSAG::link(&[&a.images, &e.images])));
+        assert!((!MLSAG::link(&[&a.images, &f.images])));
     }
 }

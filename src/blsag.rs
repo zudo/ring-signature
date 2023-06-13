@@ -126,29 +126,43 @@ impl BLSAG {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lazy_static::lazy_static;
     use rand_core::OsRng;
     use sha2::Sha512;
+    const DATA_0: &[u8] = b"hello from";
+    const DATA_1: &str = "zudo";
+    const X: usize = 2;
+    lazy_static! {
+        static ref SECRET_0: Secret = Secret::new(&mut OsRng {});
+        static ref SECRET_1: Secret = Secret::new(&mut OsRng {});
+        static ref RING_0: Ring = Ring::random(X);
+        static ref RING_1: Ring = Ring::random(X);
+    }
     #[test]
     fn sign_verify() {
         let rng = &mut OsRng {};
-        let secret_key_0 = Secret::new(rng);
-        let secret_key_1 = Secret::new(rng);
-        let data_0 = b"hello";
-        let data_1 = b"world";
-        for n in 2..11 {
-            let ring_0 = Ring::random(n - 1);
-            let ring_1 = Ring::random(n - 1);
-            let blsag_0 =
-                BLSAG::sign::<Sha512>(rng, &secret_key_0, ring_0.clone(), data_0).unwrap();
-            let blsag_1 = BLSAG::sign::<Sha512>(rng, &secret_key_0, ring_1, data_1).unwrap();
-            assert!((blsag_0.verify::<Sha512>(data_0)));
-            assert!((blsag_1.verify::<Sha512>(data_1)));
-            assert!((BLSAG::link(&[blsag_0.image, blsag_1.image])));
-            // since the key images are different, the signatures are not linked
-            let blsag_2 = BLSAG::sign::<Sha512>(rng, &secret_key_1, ring_0, data_0).unwrap();
-            assert!((blsag_2.verify::<Sha512>(data_0)));
-            assert!(!(BLSAG::link(&[blsag_0.image, blsag_2.image])));
-            assert!(!(BLSAG::link(&[blsag_1.image, blsag_2.image])));
-        }
+        let a = BLSAG::sign::<Sha512>(rng, &SECRET_0, RING_0.clone(), DATA_0).unwrap();
+        let b = BLSAG::sign::<Sha512>(rng, &SECRET_0, RING_1.clone(), DATA_0).unwrap();
+        let c = BLSAG::sign::<Sha512>(rng, &SECRET_1, RING_0.clone(), DATA_0).unwrap();
+        let d = BLSAG::sign::<Sha512>(rng, &SECRET_1, RING_1.clone(), DATA_0).unwrap();
+        assert!((a.verify::<Sha512>(DATA_0)));
+        assert!((b.verify::<Sha512>(DATA_0)));
+        assert!((c.verify::<Sha512>(DATA_0)));
+        assert!((d.verify::<Sha512>(DATA_0)));
+    }
+    #[test]
+    fn link() {
+        let rng = &mut OsRng {};
+        let a = BLSAG::sign::<Sha512>(rng, &SECRET_0, RING_0.clone(), DATA_1).unwrap();
+        let b = BLSAG::sign::<Sha512>(rng, &SECRET_0, RING_1.clone(), DATA_0).unwrap();
+        let c = BLSAG::sign::<Sha512>(rng, &SECRET_1, RING_0.clone(), DATA_0).unwrap();
+        let d = BLSAG::sign::<Sha512>(rng, &SECRET_0, RING_1.clone(), DATA_1).unwrap();
+        let e = BLSAG::sign::<Sha512>(rng, &SECRET_1, RING_0.clone(), DATA_1).unwrap();
+        let f = BLSAG::sign::<Sha512>(rng, &SECRET_1, RING_1.clone(), DATA_1).unwrap();
+        assert!((BLSAG::link(&[a.image, b.image])));
+        assert!((!BLSAG::link(&[a.image, c.image])));
+        assert!((BLSAG::link(&[a.image, d.image])));
+        assert!((!BLSAG::link(&[a.image, e.image])));
+        assert!((!BLSAG::link(&[a.image, f.image])));
     }
 }
