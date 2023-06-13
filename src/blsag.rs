@@ -1,5 +1,6 @@
 use crate::point;
 use crate::scalar;
+use crate::KeyImage;
 use crate::PointVec;
 use crate::ScalarVec;
 use crate::Secret;
@@ -26,7 +27,7 @@ impl BLSAG {
         mut ring: PointVec,
         data: impl AsRef<[u8]>,
     ) -> Option<BLSAG> {
-        let key_image = BLSAG::key_image::<Hash>(&secret);
+        let key_image = KeyImage::new::<Hash>(secret);
         let secret_index = rng.gen_range(0..=ring.0.len());
         ring.0.insert(
             secret_index,
@@ -63,7 +64,7 @@ impl BLSAG {
             hashes[next_index].update(
                 RistrettoPoint::multiscalar_mul(
                     &[responses.0[current_index], challenges[current_index]],
-                    &[point::hash::<Hash>(ring.0[current_index]), key_image],
+                    &[point::hash::<Hash>(ring.0[current_index]), key_image.0],
                 )
                 .compress()
                 .as_bytes(),
@@ -81,7 +82,7 @@ impl BLSAG {
             challenge: challenges[0].to_bytes(),
             responses: responses.to_bytes(),
             ring: ring.compress(),
-            key_image: key_image.compress().to_bytes(),
+            key_image: key_image.0.compress().to_bytes(),
         })
     }
     pub fn verify<Hash: Digest<OutputSize = U64> + Clone>(&self, data: impl AsRef<[u8]>) -> bool {
@@ -99,7 +100,7 @@ impl BLSAG {
             Some(x) => x,
             None => return false,
         };
-        let key_image = match point::from_slice(&self.key_image) {
+        let key_image = match KeyImage::decompress(&self.key_image) {
             Some(x) => x,
             None => return false,
         };
@@ -118,7 +119,7 @@ impl BLSAG {
                     &[responses.0[i], challenge_1],
                     &[
                         point::from_hash(Hash::new().chain_update(self.ring[i])),
-                        key_image,
+                        key_image.0,
                     ],
                 )
                 .compress()
@@ -127,10 +128,6 @@ impl BLSAG {
             challenge_1 = scalar::from_hash(hash);
         }
         challenge_0 == challenge_1
-    }
-    pub fn key_image<Hash: Digest<OutputSize = U64>>(secret: &Secret) -> RistrettoPoint {
-        let a = secret.0 * constants::RISTRETTO_BASEPOINT_POINT;
-        point::hash::<Hash>(a)
     }
     pub fn link(key_images: &[[u8; 32]]) -> bool {
         if key_images.is_empty() {

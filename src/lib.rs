@@ -1,6 +1,8 @@
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
 use curve25519_dalek::RistrettoPoint;
 use curve25519_dalek::Scalar;
+use digest::typenum::U64;
+use digest::Digest;
 use rand_core::CryptoRngCore;
 pub mod blsag;
 pub mod clsag;
@@ -111,5 +113,29 @@ impl ScalarVec2D {
                 .map(|_| (0..y).map(|_| scalar::random(rng)).collect())
                 .collect(),
         )
+    }
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct KeyImage(RistrettoPoint);
+impl KeyImage {
+    pub fn compress(&self) -> [u8; 32] {
+        self.0.compress().to_bytes()
+    }
+    pub fn decompress(bytes: &[u8; 32]) -> Option<KeyImage> {
+        Some(KeyImage(point::from_slice(bytes)?))
+    }
+    pub fn new<Hash: Digest<OutputSize = U64>>(secret: &Secret) -> KeyImage {
+        let a = secret.0 * RISTRETTO_BASEPOINT_POINT;
+        let b = point::hash::<Hash>(a);
+        KeyImage(b)
+    }
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct KeyImageVec(Vec<RistrettoPoint>);
+impl KeyImageVec {
+    pub fn new<Hash: Digest<OutputSize = U64>>(secrets: &[Secret]) -> KeyImageVec {
+        let a = secrets[0].0 * RISTRETTO_BASEPOINT_POINT;
+        let b = point::hash::<Hash>(a);
+        KeyImageVec(secrets.iter().map(|x| x.0 * b).collect())
     }
 }
