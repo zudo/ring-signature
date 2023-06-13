@@ -169,7 +169,7 @@ mod test {
     use rand_core::OsRng;
     use sha2::Sha512;
     #[test]
-    fn mlsag() {
+    fn sign_verify() {
         let rng = &mut OsRng {};
         let nr = 2;
         let nc = 2;
