@@ -1,7 +1,7 @@
 use crate::point;
 use crate::scalar;
-use crate::Responses;
 use crate::Ring;
+use crate::ScalarVec;
 use crate::Secret;
 use curve25519_dalek::constants;
 use curve25519_dalek::ristretto::RistrettoPoint;
@@ -50,14 +50,12 @@ impl BLSAG {
         );
         let mut challenges = vec![scalar::zero(); ring_size];
         challenges[current_index] = scalar::from_hash(hashes[current_index].clone());
-        let mut responses = (0..ring_size)
-            .map(|_| scalar::random(rng))
-            .collect::<Vec<_>>();
+        let mut responses = ScalarVec::random(rng, ring_size);
         loop {
             let next_index = (current_index + 1) % ring_size;
             hashes[next_index].update(
                 RistrettoPoint::multiscalar_mul(
-                    &[responses[current_index], challenges[current_index]],
+                    &[responses.0[current_index], challenges[current_index]],
                     &[constants::RISTRETTO_BASEPOINT_POINT, ring.0[current_index]],
                 )
                 .compress()
@@ -65,7 +63,7 @@ impl BLSAG {
             );
             hashes[next_index].update(
                 RistrettoPoint::multiscalar_mul(
-                    &[responses[current_index], challenges[current_index]],
+                    &[responses.0[current_index], challenges[current_index]],
                     &[point::hash::<Hash>(ring.0[current_index]), key_image],
                 )
                 .compress()
@@ -79,10 +77,10 @@ impl BLSAG {
             }
             current_index = next_index;
         }
-        responses[secret_index] = secret_scalar_1 - (challenges[secret_index] * secret.0);
+        responses.0[secret_index] = secret_scalar_1 - (challenges[secret_index] * secret.0);
         Some(BLSAG {
             challenge: challenges[0].to_bytes(),
-            responses: scalar::vec_1d::to_bytes(&responses),
+            responses: responses.to_bytes(),
             ring: ring.compress(),
             key_image: key_image.compress().to_bytes(),
         })
@@ -94,7 +92,7 @@ impl BLSAG {
             None => return false,
         };
         let mut challenge_1 = challenge_0;
-        let responses = match Responses::from_canonical(&self.responses) {
+        let responses = match ScalarVec::from_canonical(&self.responses) {
             Some(x) => x,
             None => return false,
         };

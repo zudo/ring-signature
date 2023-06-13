@@ -85,42 +85,42 @@ impl Rings {
     }
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Responses(Vec<Scalar>);
-impl Responses {
+pub struct ScalarVec(Vec<Scalar>);
+impl ScalarVec {
     pub fn to_bytes(&self) -> Vec<[u8; 32]> {
         self.0.iter().map(|x| x.to_bytes()).collect()
     }
-    pub fn from_canonical(responses: &Vec<[u8; 32]>) -> Option<Responses> {
-        Some(Responses(
+    pub fn from_canonical(responses: &Vec<[u8; 32]>) -> Option<ScalarVec> {
+        Some(ScalarVec(
             responses
                 .iter()
                 .map(|&x| scalar::from_canonical(x))
                 .collect::<Option<Vec<_>>>()?,
         ))
     }
-    pub fn random(rng: &mut impl CryptoRngCore, x: usize) -> Responses {
-        Responses((0..x).map(|_| scalar::random(rng)).collect())
+    pub fn random(rng: &mut impl CryptoRngCore, x: usize) -> ScalarVec {
+        ScalarVec((0..x).map(|_| scalar::random(rng)).collect())
     }
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Responses2d(Vec<Vec<Scalar>>);
-impl Responses2d {
+pub struct ScalarVec2D(Vec<Vec<Scalar>>);
+impl ScalarVec2D {
     pub fn to_bytes(&self) -> Vec<Vec<[u8; 32]>> {
         self.0
             .iter()
             .map(|x| x.iter().map(|y| y.to_bytes()).collect())
             .collect()
     }
-    pub fn from_canonical(responses: &Vec<Vec<[u8; 32]>>) -> Option<Responses2d> {
-        Some(Responses2d(
+    pub fn from_canonical(responses: &Vec<Vec<[u8; 32]>>) -> Option<ScalarVec2D> {
+        Some(ScalarVec2D(
             responses
                 .iter()
                 .map(|x| x.iter().map(|&y| scalar::from_canonical(y)).collect())
                 .collect::<Option<Vec<_>>>()?,
         ))
     }
-    pub fn random(rng: &mut impl CryptoRngCore, x: usize, y: usize) -> Responses2d {
-        Responses2d(
+    pub fn random(rng: &mut impl CryptoRngCore, x: usize, y: usize) -> ScalarVec2D {
+        ScalarVec2D(
             (0..x)
                 .map(|_| (0..y).map(|_| scalar::random(rng)).collect())
                 .collect(),

@@ -1,8 +1,8 @@
 use crate::point;
 use crate::scalar;
-use crate::Responses;
 use crate::Ring;
 use crate::Rings;
+use crate::ScalarVec;
 use crate::Secret;
 use curve25519_dalek::constants;
 use curve25519_dalek::ristretto::RistrettoPoint;
@@ -72,7 +72,7 @@ impl CLSAG {
         hashes[current_index].update((secret_scalar * base_point).compress().as_bytes());
         let mut challenges = vec![scalar::zero(); ring_size];
         challenges[current_index] = scalar::from_hash(hashes[current_index].clone());
-        let mut responses = Responses::random(rng, ring_size);
+        let mut responses = ScalarVec::random(rng, ring_size);
         loop {
             let next_index = (current_index + 1) % ring_size;
             hashes[next_index].update(
@@ -131,7 +131,7 @@ impl CLSAG {
             Some(x) => x,
             None => return false,
         };
-        let responses = match Responses::from_canonical(&self.responses) {
+        let responses = match ScalarVec::from_canonical(&self.responses) {
             Some(x) => x,
             None => return false,
         };
