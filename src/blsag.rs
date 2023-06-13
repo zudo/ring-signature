@@ -152,7 +152,7 @@ mod test {
     use rand_core::OsRng;
     use sha2::Sha512;
     #[test]
-    fn blsag() {
+    fn sign_verify() {
         let rng = &mut OsRng {};
         let secret_key_0 = Secret::new(rng);
         let secret_key_1 = Secret::new(rng);

@@ -103,7 +103,7 @@ pub mod test {
     use rand_core::OsRng;
     use sha2::Sha512;
     #[test]
-    fn sag() {
+    fn sign_verify() {
         let rng = &mut OsRng {};
         let secret = Secret::new(rng);
         let data = b"hello world";

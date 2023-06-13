@@ -264,7 +264,7 @@ mod test {
     use rand_core::OsRng;
     use sha2::Sha512;
     #[test]
-    fn blsag() {
+    fn sign_verify() {
         let rng = &mut OsRng {};
         let ring_size = 2;
         let ring_layers = 2;
