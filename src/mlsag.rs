@@ -38,8 +38,8 @@ impl MLSAG {
         let secret_index = rng.gen_range(0..nr);
         rings.0.insert(secret_index, k_points.clone());
         let a: Vec<Scalar> = (0..nc).map(|_| scalar::random(rng)).collect();
-        let mut rs = ScalarVec2D::random(rng, nr, nc);
-        let mut cs: Vec<Scalar> = (0..nr).map(|_| scalar::zero()).collect();
+        let mut responses = ScalarVec2D::random(rng, nr, nc);
+        let mut challenges: Vec<Scalar> = (0..nr).map(|_| scalar::zero()).collect();
         let mut hash = Hash::new();
         hash.update(message);
         let mut hashes: Vec<Hash> = (0..nr).map(|_| hash.clone()).collect();
@@ -55,13 +55,14 @@ impl MLSAG {
                     .as_bytes(),
             );
         }
-        cs[(secret_index + 1) % nr] = scalar::from_hash(hashes[(secret_index + 1) % nr].clone());
+        challenges[(secret_index + 1) % nr] =
+            scalar::from_hash(hashes[(secret_index + 1) % nr].clone());
         let mut i = (secret_index + 1) % nr;
         loop {
             for j in 0..nc {
                 hashes[(i + 1) % nr].update(
                     RistrettoPoint::multiscalar_mul(
-                        &[rs.0[i % nr][j], cs[i % nr]],
+                        &[responses.0[i % nr][j], challenges[i % nr]],
                         &[constants::RISTRETTO_BASEPOINT_POINT, rings.0[i % nr][j]],
                     )
                     .compress()
@@ -69,14 +70,14 @@ impl MLSAG {
                 );
                 hashes[(i + 1) % nr].update(
                     RistrettoPoint::multiscalar_mul(
-                        &[rs.0[i % nr][j], cs[i % nr]],
+                        &[responses.0[i % nr][j], challenges[i % nr]],
                         &[point::hash::<Hash>(rings.0[i % nr][j]), key_images.0[j]],
                     )
                     .compress()
                     .as_bytes(),
                 );
             }
-            cs[(i + 1) % nr] = scalar::from_hash(hashes[(i + 1) % nr].clone());
+            challenges[(i + 1) % nr] = scalar::from_hash(hashes[(i + 1) % nr].clone());
             if secret_index >= 1 && i % nr == (secret_index - 1) % nr {
                 break;
             } else if secret_index == 0 && i % nr == nr - 1 {
@@ -86,11 +87,11 @@ impl MLSAG {
             }
         }
         for j in 0..nc {
-            rs.0[secret_index][j] = a[j] - (cs[secret_index] * secrets[j].0);
+            responses.0[secret_index][j] = a[j] - (challenges[secret_index] * secrets[j].0);
         }
         Some(MLSAG {
-            challenge: cs[0].to_bytes(),
-            responses: rs.to_bytes(),
+            challenge: challenges[0].to_bytes(),
+            responses: responses.to_bytes(),
             ring: rings.compress(),
             key_images: key_images.compress(),
         })
