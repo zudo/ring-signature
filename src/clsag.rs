@@ -1,6 +1,6 @@
 use crate::point;
 use crate::scalar;
-use crate::KeyImageVec;
+use crate::ImageVec;
 use crate::PointVec2D;
 use crate::ScalarVec;
 use crate::Secret;
@@ -19,7 +19,7 @@ pub struct CLSAG {
     pub challenge: [u8; 32],
     pub responses: Vec<[u8; 32]>,
     pub rings: Vec<Vec<[u8; 32]>>,
-    pub key_images: Vec<[u8; 32]>,
+    pub images: Vec<[u8; 32]>,
 }
 impl CLSAG {
     pub fn sign<Hash: Digest<OutputSize = U64> + Clone>(
@@ -28,7 +28,7 @@ impl CLSAG {
         mut rings: PointVec2D,
         data: impl AsRef<[u8]>,
     ) -> Option<CLSAG> {
-        let key_images = KeyImageVec::new::<Hash>(secrets);
+        let images = ImageVec::new::<Hash>(secrets);
         let public_points = secrets
             .iter()
             .map(|x| x.0 * constants::RISTRETTO_BASEPOINT_POINT)
@@ -38,17 +38,14 @@ impl CLSAG {
         rings.0.insert(secret_index, public_points);
         let ring_size = rings.0.len();
         let ring_layers = rings.0[0].len();
-        let prefixed_hashes_with_key_images =
-            CLSAG::prefixed_hashes_with_key_images::<Hash>(&rings, &key_images);
+        let prefixed_hashes_with_images =
+            CLSAG::prefixed_hashes_with_images::<Hash>(&rings, &images);
         let aggregate_private_key =
-            CLSAG::aggregate_private_key(&rings, &prefixed_hashes_with_key_images, secrets);
+            CLSAG::aggregate_private_key(&rings, &prefixed_hashes_with_images, secrets);
         let aggregate_public_keys =
-            CLSAG::aggregate_public_keys(&rings, &prefixed_hashes_with_key_images);
-        let aggregate_key_image = CLSAG::aggregate_key_image::<Hash>(
-            &rings,
-            &prefixed_hashes_with_key_images,
-            &key_images,
-        );
+            CLSAG::aggregate_public_keys(&rings, &prefixed_hashes_with_images);
+        let aggregate_image =
+            CLSAG::aggregate_image::<Hash>(&rings, &prefixed_hashes_with_images, &images);
         let mut hashes = (0..ring_size)
             .map(|_| {
                 let mut hash = Hash::new();
@@ -97,7 +94,7 @@ impl CLSAG {
                     ],
                     &[
                         point::hash::<Hash>(rings.0[current_index % ring_size][0]),
-                        aggregate_key_image,
+                        aggregate_image,
                     ],
                 )
                 .compress()
@@ -117,7 +114,7 @@ impl CLSAG {
             challenge: challenges[0].to_bytes(),
             responses: responses.to_bytes(),
             rings: rings.compress(),
-            key_images: key_images.compress(),
+            images: images.compress(),
         })
     }
     pub fn verify<Hash: Digest<OutputSize = U64> + Clone>(&self, data: impl AsRef<[u8]>) -> bool {
@@ -125,19 +122,16 @@ impl CLSAG {
             let ring_size = self.rings.len();
             let ring_layers = self.rings[0].len();
             let rings = PointVec2D::decompress(&self.rings)?;
-            let key_images = KeyImageVec::decompress(&self.key_images)?;
+            let images = ImageVec::decompress(&self.images)?;
             let responses = ScalarVec::from_canonical(&self.responses)?;
             let challenge_0 = scalar::from_canonical(self.challenge)?;
             let mut challenge_1 = challenge_0;
-            let prefixed_hashes_with_key_images =
-                CLSAG::prefixed_hashes_with_key_images::<Hash>(&rings, &key_images);
+            let prefixed_hashes_with_images =
+                CLSAG::prefixed_hashes_with_images::<Hash>(&rings, &images);
             let aggregate_public_keys =
-                CLSAG::aggregate_public_keys(&rings, &prefixed_hashes_with_key_images);
-            let aggregate_key_image = CLSAG::aggregate_key_image::<Hash>(
-                &rings,
-                &prefixed_hashes_with_key_images,
-                &key_images,
-            );
+                CLSAG::aggregate_public_keys(&rings, &prefixed_hashes_with_images);
+            let aggregate_image =
+                CLSAG::aggregate_image::<Hash>(&rings, &prefixed_hashes_with_images, &images);
             for i in 0..ring_size {
                 let mut hash: Hash = Hash::new();
                 hash.update(format!("CLSAG_c"));
@@ -161,7 +155,7 @@ impl CLSAG {
                 hash.update(
                     RistrettoPoint::multiscalar_mul(
                         &[responses.0[i], challenge_1],
-                        &[point::hash::<Hash>(rings.0[i][0]), aggregate_key_image],
+                        &[point::hash::<Hash>(rings.0[i][0]), aggregate_image],
                     )
                     .compress()
                     .as_bytes(),
@@ -174,18 +168,18 @@ impl CLSAG {
             None => false,
         }
     }
-    pub fn link(key_images: &[&[[u8; 32]]]) -> bool {
-        if key_images.is_empty() || key_images[0].is_empty() {
+    pub fn link(images: &[&[[u8; 32]]]) -> bool {
+        if images.is_empty() || images[0].is_empty() {
             return false;
         }
-        key_images
+        images
             .iter()
             .skip(1)
-            .all(|x| !x.is_empty() && x[0] == key_images[0][0])
+            .all(|x| !x.is_empty() && x[0] == images[0][0])
     }
-    fn prefixed_hashes_with_key_images<Hash: Digest<OutputSize = U64>>(
+    fn prefixed_hashes_with_images<Hash: Digest<OutputSize = U64>>(
         rings: &PointVec2D,
-        key_images: &KeyImageVec,
+        images: &ImageVec,
     ) -> Vec<Hash> {
         let ring_size = rings.0.len();
         let ring_layers = rings.0[0].len();
@@ -199,7 +193,7 @@ impl CLSAG {
                     }
                 }
                 for j in 0..ring_layers {
-                    hash.update(key_images.0[j].compress().as_bytes());
+                    hash.update(images.0[j].compress().as_bytes());
                 }
                 hash
             })
@@ -207,17 +201,17 @@ impl CLSAG {
     }
     fn aggregate_private_key<Hash: Digest<OutputSize = U64> + Clone>(
         rings: &PointVec2D,
-        prefixed_hashes_with_key_images: &Vec<Hash>,
+        prefixed_hashes_with_images: &Vec<Hash>,
         secrets: &[Secret],
     ) -> Scalar {
         let ring_layers = rings.0[0].len();
         (0..ring_layers)
-            .map(|i| scalar::from_hash(prefixed_hashes_with_key_images[i].clone()) * secrets[i].0)
+            .map(|i| scalar::from_hash(prefixed_hashes_with_images[i].clone()) * secrets[i].0)
             .sum()
     }
     fn aggregate_public_keys<Hash: Digest<OutputSize = U64> + Clone>(
         rings: &PointVec2D,
-        prefixed_hashes_with_key_images: &Vec<Hash>,
+        prefixed_hashes_with_images: &Vec<Hash>,
     ) -> Vec<RistrettoPoint> {
         let ring_size = rings.0.len();
         let ring_layers = rings.0[0].len();
@@ -225,23 +219,20 @@ impl CLSAG {
             .map(|i| {
                 (0..ring_layers)
                     .map(|j| {
-                        scalar::from_hash(prefixed_hashes_with_key_images[j].clone())
-                            * rings.0[i][j]
+                        scalar::from_hash(prefixed_hashes_with_images[j].clone()) * rings.0[i][j]
                     })
                     .sum()
             })
             .collect()
     }
-    fn aggregate_key_image<Hash: Digest<OutputSize = U64> + Clone>(
+    fn aggregate_image<Hash: Digest<OutputSize = U64> + Clone>(
         rings: &PointVec2D,
-        prefixed_hashes_with_key_images: &Vec<Hash>,
-        key_images: &KeyImageVec,
+        prefixed_hashes_with_images: &Vec<Hash>,
+        images: &ImageVec,
     ) -> RistrettoPoint {
         let ring_layers = rings.0[0].len();
         (0..ring_layers)
-            .map(|i| {
-                scalar::from_hash(prefixed_hashes_with_key_images[i].clone()) * key_images.0[i]
-            })
+            .map(|i| scalar::from_hash(prefixed_hashes_with_images[i].clone()) * images.0[i])
             .sum()
     }
 }
@@ -267,8 +258,8 @@ mod tests {
         let blsag_1 = CLSAG::sign::<Sha512>(rng, &secrets, ring_1, data_1).unwrap();
         assert!((blsag_0.verify::<Sha512>(data_0)));
         assert!((blsag_1.verify::<Sha512>(data_1)));
-        println!("{:?}", blsag_0.key_images);
-        println!("{:?}", blsag_1.key_images);
-        assert!((CLSAG::link(&[&blsag_0.key_images, &blsag_1.key_images])));
+        println!("{:?}", blsag_0.images);
+        println!("{:?}", blsag_1.images);
+        assert!((CLSAG::link(&[&blsag_0.images, &blsag_1.images])));
     }
 }

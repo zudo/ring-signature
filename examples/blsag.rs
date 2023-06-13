@@ -17,5 +17,5 @@ fn main() {
     println!("{:?}", blsag_1);
     println!("{:?}", blsag_0.verify::<Sha512>(data_0));
     println!("{:?}", blsag_1.verify::<Sha512>(data_1));
-    println!("{}", BLSAG::link(&[blsag_0.key_image, blsag_1.key_image]));
+    println!("{}", BLSAG::link(&[blsag_0.image, blsag_1.image]));
 }

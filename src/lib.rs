@@ -116,37 +116,37 @@ impl ScalarVec2D {
     }
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct KeyImage(RistrettoPoint);
-impl KeyImage {
+pub struct Image(RistrettoPoint);
+impl Image {
     pub fn compress(&self) -> [u8; 32] {
         self.0.compress().to_bytes()
     }
-    pub fn decompress(bytes: &[u8; 32]) -> Option<KeyImage> {
-        Some(KeyImage(point::from_slice(bytes)?))
+    pub fn decompress(bytes: &[u8; 32]) -> Option<Image> {
+        Some(Image(point::from_slice(bytes)?))
     }
-    pub fn new<Hash: Digest<OutputSize = U64>>(secret: &Secret) -> KeyImage {
+    pub fn new<Hash: Digest<OutputSize = U64>>(secret: &Secret) -> Image {
         let a = secret.0 * RISTRETTO_BASEPOINT_POINT;
         let b = point::hash::<Hash>(a);
-        KeyImage(b)
+        Image(b)
     }
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct KeyImageVec(Vec<RistrettoPoint>);
-impl KeyImageVec {
+pub struct ImageVec(Vec<RistrettoPoint>);
+impl ImageVec {
     pub fn compress(&self) -> Vec<[u8; 32]> {
         self.0.iter().map(|x| x.compress().to_bytes()).collect()
     }
-    pub fn decompress(bytes: &Vec<[u8; 32]>) -> Option<KeyImageVec> {
-        Some(KeyImageVec(
+    pub fn decompress(bytes: &Vec<[u8; 32]>) -> Option<ImageVec> {
+        Some(ImageVec(
             bytes
                 .iter()
                 .map(|x| point::from_slice(x))
                 .collect::<Option<Vec<_>>>()?,
         ))
     }
-    pub fn new<Hash: Digest<OutputSize = U64>>(secrets: &[Secret]) -> KeyImageVec {
+    pub fn new<Hash: Digest<OutputSize = U64>>(secrets: &[Secret]) -> ImageVec {
         let a = secrets[0].0 * RISTRETTO_BASEPOINT_POINT;
         let b = point::hash::<Hash>(a);
-        KeyImageVec(secrets.iter().map(|x| x.0 * b).collect())
+        ImageVec(secrets.iter().map(|x| x.0 * b).collect())
     }
 }

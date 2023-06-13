@@ -1,6 +1,6 @@
 use crate::point;
 use crate::scalar;
-use crate::KeyImageVec;
+use crate::ImageVec;
 use crate::PointVec2D;
 use crate::ScalarVec2D;
 use crate::Secret;
@@ -19,7 +19,7 @@ pub struct MLSAG {
     pub challenge: [u8; 32],
     pub responses: Vec<Vec<[u8; 32]>>,
     pub ring: Vec<Vec<[u8; 32]>>,
-    pub key_images: Vec<[u8; 32]>,
+    pub images: Vec<[u8; 32]>,
 }
 impl MLSAG {
     pub fn sign<Hash: Digest<OutputSize = U64> + Clone>(
@@ -34,7 +34,7 @@ impl MLSAG {
             .iter()
             .map(|x| x.0 * constants::RISTRETTO_BASEPOINT_POINT)
             .collect::<Vec<_>>();
-        let key_images = MLSAG::image::<Hash>(secrets);
+        let images = MLSAG::image::<Hash>(secrets);
         let secret_index = rng.gen_range(0..nr);
         rings.0.insert(secret_index, k_points.clone());
         let a: Vec<Scalar> = (0..nc).map(|_| scalar::random(rng)).collect();
@@ -71,7 +71,7 @@ impl MLSAG {
                 hashes[(i + 1) % nr].update(
                     RistrettoPoint::multiscalar_mul(
                         &[responses.0[i % nr][j], challenges[i % nr]],
-                        &[point::hash::<Hash>(rings.0[i % nr][j]), key_images.0[j]],
+                        &[point::hash::<Hash>(rings.0[i % nr][j]), images.0[j]],
                     )
                     .compress()
                     .as_bytes(),
@@ -93,13 +93,13 @@ impl MLSAG {
             challenge: challenges[0].to_bytes(),
             responses: responses.to_bytes(),
             ring: rings.compress(),
-            key_images: key_images.compress(),
+            images: images.compress(),
         })
     }
     pub fn verify<Hash: Digest<OutputSize = U64> + Clone>(&self, message: &Vec<u8>) -> bool {
         match || -> Option<bool> {
             let rings = PointVec2D::decompress(&self.ring)?;
-            let key_images = KeyImageVec::decompress(&self.key_images)?;
+            let images = ImageVec::decompress(&self.images)?;
             let responses = ScalarVec2D::from_canonical(&self.responses)?;
             let challenge_0 = scalar::from_canonical(self.challenge)?;
             let mut challenge_1 = challenge_0;
@@ -120,7 +120,7 @@ impl MLSAG {
                     hash.update(
                         RistrettoPoint::multiscalar_mul(
                             &[responses.0[i][j], challenge_1],
-                            &[point::hash::<Hash>(rings.0[i][j]), key_images.0[j]],
+                            &[point::hash::<Hash>(rings.0[i][j]), images.0[j]],
                         )
                         .compress()
                         .as_bytes(),
@@ -134,26 +134,26 @@ impl MLSAG {
             None => return false,
         }
     }
-    pub fn image<Hash: Digest<OutputSize = U64>>(secrets: &[Secret]) -> KeyImageVec {
+    pub fn image<Hash: Digest<OutputSize = U64>>(secrets: &[Secret]) -> ImageVec {
         let nc = secrets.len();
         let publics = secrets
             .iter()
             .map(|x| x.0 * constants::RISTRETTO_BASEPOINT_POINT)
             .collect::<Vec<_>>();
-        KeyImageVec(
+        ImageVec(
             (0..nc)
                 .map(|i| secrets[i].0 * point::hash::<Hash>(publics[i]))
                 .collect(),
         )
     }
-    pub fn link(key_images: &[Vec<[u8; 32]>]) -> bool {
-        if key_images.is_empty() || key_images[0].is_empty() {
+    pub fn link(images: &[Vec<[u8; 32]>]) -> bool {
+        if images.is_empty() || images[0].is_empty() {
             return false;
         }
-        key_images
+        images
             .iter()
             .skip(1)
-            .all(|x| !x.is_empty() && x[0] == key_images[0][0])
+            .all(|x| !x.is_empty() && x[0] == images[0][0])
     }
 }
 #[cfg(test)]
@@ -184,7 +184,7 @@ mod tests {
         let mlsag_1 =
             MLSAG::sign::<Sha512>(rng, &secrets, another_rings, &another_message).unwrap();
         let mlsag_2 = MLSAG::sign::<Sha512>(rng, &secrets, rings, &message).unwrap();
-        let result = MLSAG::link(&[mlsag_1.key_images, mlsag_2.key_images]);
+        let result = MLSAG::link(&[mlsag_1.images, mlsag_2.images]);
         assert!(result);
     }
 }

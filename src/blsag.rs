@@ -1,6 +1,6 @@
 use crate::point;
 use crate::scalar;
-use crate::KeyImage;
+use crate::Image;
 use crate::PointVec;
 use crate::ScalarVec;
 use crate::Secret;
@@ -18,7 +18,7 @@ pub struct BLSAG {
     pub challenge: [u8; 32],
     pub responses: Vec<[u8; 32]>,
     pub ring: Vec<[u8; 32]>,
-    pub key_image: [u8; 32],
+    pub image: [u8; 32],
 }
 impl BLSAG {
     pub fn sign<Hash: Digest<OutputSize = U64> + Clone>(
@@ -27,7 +27,7 @@ impl BLSAG {
         mut ring: PointVec,
         data: impl AsRef<[u8]>,
     ) -> Option<BLSAG> {
-        let key_image = KeyImage::new::<Hash>(secret);
+        let image = Image::new::<Hash>(secret);
         let secret_index = rng.gen_range(0..=ring.0.len());
         ring.0.insert(
             secret_index,
@@ -64,7 +64,7 @@ impl BLSAG {
             hashes[next_index].update(
                 RistrettoPoint::multiscalar_mul(
                     &[responses.0[current_index], challenges[current_index]],
-                    &[point::hash::<Hash>(ring.0[current_index]), key_image.0],
+                    &[point::hash::<Hash>(ring.0[current_index]), image.0],
                 )
                 .compress()
                 .as_bytes(),
@@ -82,7 +82,7 @@ impl BLSAG {
             challenge: challenges[0].to_bytes(),
             responses: responses.to_bytes(),
             ring: ring.compress(),
-            key_image: key_image.compress(),
+            image: image.compress(),
         })
     }
     pub fn verify<Hash: Digest<OutputSize = U64> + Clone>(&self, data: impl AsRef<[u8]>) -> bool {
@@ -92,7 +92,7 @@ impl BLSAG {
             let mut challenge_1 = challenge_0;
             let responses = ScalarVec::from_canonical(&self.responses)?;
             let ring = PointVec::decompress(&self.ring)?;
-            let key_image = KeyImage::decompress(&self.key_image)?;
+            let image = Image::decompress(&self.image)?;
             for i in 0..self.ring.len() {
                 let mut hash = hash.clone();
                 hash.update(
@@ -108,7 +108,7 @@ impl BLSAG {
                         &[responses.0[i], challenge_1],
                         &[
                             point::from_hash(Hash::new().chain_update(self.ring[i])),
-                            key_image.0,
+                            image.0,
                         ],
                     )
                     .compress()
@@ -122,11 +122,11 @@ impl BLSAG {
             None => return false,
         }
     }
-    pub fn link(key_images: &[[u8; 32]]) -> bool {
-        if key_images.is_empty() {
+    pub fn link(images: &[[u8; 32]]) -> bool {
+        if images.is_empty() {
             return false;
         }
-        key_images.iter().skip(1).all(|x| x == &key_images[0])
+        images.iter().skip(1).all(|x| x == &images[0])
     }
 }
 #[cfg(test)]
@@ -149,12 +149,12 @@ mod tests {
             let blsag_1 = BLSAG::sign::<Sha512>(rng, &secret_key_0, ring_1, data_1).unwrap();
             assert!((blsag_0.verify::<Sha512>(data_0)));
             assert!((blsag_1.verify::<Sha512>(data_1)));
-            assert!((BLSAG::link(&[blsag_0.key_image, blsag_1.key_image])));
+            assert!((BLSAG::link(&[blsag_0.image, blsag_1.image])));
             // since the key images are different, the signatures are not linked
             let blsag_2 = BLSAG::sign::<Sha512>(rng, &secret_key_1, ring_0, data_0).unwrap();
             assert!((blsag_2.verify::<Sha512>(data_0)));
-            assert!(!(BLSAG::link(&[blsag_0.key_image, blsag_2.key_image])));
-            assert!(!(BLSAG::link(&[blsag_1.key_image, blsag_2.key_image])));
+            assert!(!(BLSAG::link(&[blsag_0.image, blsag_2.image])));
+            assert!(!(BLSAG::link(&[blsag_1.image, blsag_2.image])));
         }
     }
 }

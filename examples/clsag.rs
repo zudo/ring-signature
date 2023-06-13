@@ -39,9 +39,6 @@ fn main() {
     println!("{:?}", blsag_1);
     println!("{:?}", blsag_0.verify::<Sha512>(data_0));
     println!("{:?}", blsag_1.verify::<Sha512>(data_1));
-    println!(
-        "{}",
-        CLSAG::link(&[&blsag_0.key_images, &blsag_1.key_images])
-    );
+    println!("{}", CLSAG::link(&[&blsag_0.images, &blsag_1.images]));
     println!("{}", bincode::serialize(&blsag_0).unwrap().len())
 }
