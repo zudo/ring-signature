@@ -24,12 +24,11 @@ impl SAG {
         ring: Ring,
         data: impl AsRef<[u8]>,
     ) -> Option<SAG> {
-        let secret_scalar_0 = secret.0;
         let mut ring_0 = ring.0;
         let secret_index = rng.gen_range(0..=ring_0.len());
         ring_0.insert(
             secret_index,
-            secret_scalar_0 * constants::RISTRETTO_BASEPOINT_POINT,
+            secret.0 * constants::RISTRETTO_BASEPOINT_POINT,
         );
         let ring_size = ring_0.len();
         let hash = Hash::new().chain_update(data);
@@ -64,7 +63,7 @@ impl SAG {
             }
             current_index = next_index;
         }
-        responses[secret_index] = secret_scalar_1 - (challenges[secret_index] * secret_scalar_0);
+        responses[secret_index] = secret_scalar_1 - (challenges[secret_index] * secret.0);
         Some(SAG {
             challenge: challenges[0].to_bytes(),
             responses: scalar::vec_1d::to_bytes(&responses),

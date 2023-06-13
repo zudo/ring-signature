@@ -26,12 +26,11 @@ impl CLSAG {
         rings: Rings,
         data: impl AsRef<[u8]>,
     ) -> Option<CLSAG> {
-        let secret_scalars = secrets.iter().map(|x| x.0).collect::<Vec<_>>();
-        let key_images = CLSAG::key_image::<Hash>(&secret_scalars);
+        let key_images = CLSAG::key_image::<Hash>(secrets);
         let mut rings = rings.0;
-        let public_points = secret_scalars
+        let public_points = secrets
             .iter()
-            .map(|x| x * constants::RISTRETTO_BASEPOINT_POINT)
+            .map(|x| x.0 * constants::RISTRETTO_BASEPOINT_POINT)
             .collect::<Vec<_>>();
         let base_point = point::hash::<Hash>(public_points[0]);
         let secret_index = rng.gen_range(0..=rings.len());
@@ -41,7 +40,7 @@ impl CLSAG {
         let prefixed_hashes_with_key_images =
             CLSAG::prefixed_hashes_with_key_images::<Hash>(&rings, &key_images);
         let aggregate_private_key =
-            CLSAG::aggregate_private_key(&rings, &prefixed_hashes_with_key_images, &secret_scalars);
+            CLSAG::aggregate_private_key(&rings, &prefixed_hashes_with_key_images, secrets);
         let aggregate_public_keys =
             CLSAG::aggregate_public_keys(&rings, &prefixed_hashes_with_key_images);
         let aggregate_key_image = CLSAG::aggregate_key_image::<Hash>(
@@ -177,12 +176,10 @@ impl CLSAG {
         }
         challenge_0 == challenge_1
     }
-    pub fn key_image<Hash: Digest<OutputSize = U64>>(
-        secret_keys: &[Scalar],
-    ) -> Vec<RistrettoPoint> {
-        let a = secret_keys[0] * constants::RISTRETTO_BASEPOINT_POINT;
+    pub fn key_image<Hash: Digest<OutputSize = U64>>(secrets: &[Secret]) -> Vec<RistrettoPoint> {
+        let a = secrets[0].0 * constants::RISTRETTO_BASEPOINT_POINT;
         let b = point::hash::<Hash>(a);
-        secret_keys.iter().map(|x| x * b).collect()
+        secrets.iter().map(|x| x.0 * b).collect()
     }
     pub fn link(key_images: &[&[[u8; 32]]]) -> bool {
         if key_images.is_empty() || key_images[0].is_empty() {
@@ -218,13 +215,11 @@ impl CLSAG {
     fn aggregate_private_key<Hash: Digest<OutputSize = U64> + Clone>(
         rings: &Vec<Vec<RistrettoPoint>>,
         prefixed_hashes_with_key_images: &Vec<Hash>,
-        secret_scalars: &Vec<Scalar>,
+        secrets: &[Secret],
     ) -> Scalar {
         let ring_layers = rings[0].len();
         (0..ring_layers)
-            .map(|i| {
-                scalar::from_hash(prefixed_hashes_with_key_images[i].clone()) * secret_scalars[i]
-            })
+            .map(|i| scalar::from_hash(prefixed_hashes_with_key_images[i].clone()) * secrets[i].0)
             .sum()
     }
     fn aggregate_public_keys<Hash: Digest<OutputSize = U64> + Clone>(

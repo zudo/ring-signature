@@ -25,15 +25,14 @@ impl MLSAG {
         rings: &Vec<Vec<[u8; 32]>>,
         message: impl AsRef<[u8]>,
     ) -> Option<MLSAG> {
-        let secret_scalars_0 = secrets.iter().map(|x| x.0).collect::<Vec<_>>();
         let nr = rings.len() + 1;
         let nc = rings[0].len();
         let mut rings_0 = point::vec_2d::from_slice(rings)?;
-        let k_points = secret_scalars_0
+        let k_points = secrets
             .iter()
-            .map(|k| k * constants::RISTRETTO_BASEPOINT_POINT)
+            .map(|x| x.0 * constants::RISTRETTO_BASEPOINT_POINT)
             .collect::<Vec<_>>();
-        let key_images: Vec<RistrettoPoint> = MLSAG::image::<Hash>(&secret_scalars_0);
+        let key_images: Vec<RistrettoPoint> = MLSAG::image::<Hash>(secrets);
         let secret_index = rng.gen_range(0..nr);
         rings_0.insert(secret_index, k_points.clone());
         let a: Vec<Scalar> = (0..nc).map(|_| scalar::random(rng)).collect();
@@ -87,7 +86,7 @@ impl MLSAG {
             }
         }
         for j in 0..nc {
-            rs[secret_index][j] = a[j] - (cs[secret_index] * secret_scalars_0[j]);
+            rs[secret_index][j] = a[j] - (cs[secret_index] * secrets[j].0);
         }
         Some(MLSAG {
             challenge: cs[0].to_bytes(),
@@ -135,14 +134,14 @@ impl MLSAG {
         }
         challenge_0 == challenge_1
     }
-    pub fn image<Hash: Digest<OutputSize = U64>>(secret_keys: &[Scalar]) -> Vec<RistrettoPoint> {
-        let nc = secret_keys.len();
-        let publics = secret_keys
+    pub fn image<Hash: Digest<OutputSize = U64>>(secrets: &[Secret]) -> Vec<RistrettoPoint> {
+        let nc = secrets.len();
+        let publics = secrets
             .iter()
-            .map(|x| x * constants::RISTRETTO_BASEPOINT_POINT)
+            .map(|x| x.0 * constants::RISTRETTO_BASEPOINT_POINT)
             .collect::<Vec<_>>();
         (0..nc)
-            .map(|i| secret_keys[i] * point::hash::<Hash>(publics[i]))
+            .map(|i| secrets[i].0 * point::hash::<Hash>(publics[i]))
             .collect()
     }
     pub fn link(key_images: &[Vec<[u8; 32]>]) -> bool {
