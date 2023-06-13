@@ -51,6 +51,9 @@ impl Ring {
                 .collect::<Option<Vec<_>>>()?,
         ))
     }
+    pub fn random(x: usize) -> Ring {
+        Ring((0..x).map(|_| point::random()).collect())
+    }
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Rings(Vec<Vec<RistrettoPoint>>);
@@ -72,5 +75,55 @@ impl Rings {
                 })
                 .collect::<Option<Vec<_>>>()?,
         ))
+    }
+    pub fn random(x: usize, y: usize) -> Rings {
+        Rings(
+            (0..x)
+                .map(|_| (0..y).map(|_| point::random()).collect())
+                .collect(),
+        )
+    }
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Responses(Vec<Scalar>);
+impl Responses {
+    pub fn to_bytes(&self) -> Vec<[u8; 32]> {
+        self.0.iter().map(|x| x.to_bytes()).collect()
+    }
+    pub fn from_canonical(responses: &Vec<[u8; 32]>) -> Option<Responses> {
+        Some(Responses(
+            responses
+                .iter()
+                .map(|&x| scalar::from_canonical(x))
+                .collect::<Option<Vec<_>>>()?,
+        ))
+    }
+    pub fn random(rng: &mut impl CryptoRngCore, x: usize) -> Responses {
+        Responses((0..x).map(|_| scalar::random(rng)).collect())
+    }
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Responses2d(Vec<Vec<Scalar>>);
+impl Responses2d {
+    pub fn to_bytes(&self) -> Vec<Vec<[u8; 32]>> {
+        self.0
+            .iter()
+            .map(|x| x.iter().map(|y| y.to_bytes()).collect())
+            .collect()
+    }
+    pub fn from_canonical(responses: &Vec<Vec<[u8; 32]>>) -> Option<Responses2d> {
+        Some(Responses2d(
+            responses
+                .iter()
+                .map(|x| x.iter().map(|&y| scalar::from_canonical(y)).collect())
+                .collect::<Option<Vec<_>>>()?,
+        ))
+    }
+    pub fn random(rng: &mut impl CryptoRngCore, x: usize, y: usize) -> Responses2d {
+        Responses2d(
+            (0..x)
+                .map(|_| (0..y).map(|_| scalar::random(rng)).collect())
+                .collect(),
+        )
     }
 }

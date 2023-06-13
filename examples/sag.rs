@@ -1,5 +1,4 @@
 use rand_core::OsRng;
-use ring_signature::point;
 use ring_signature::sag::SAG;
 use ring_signature::Ring;
 use ring_signature::Secret;
@@ -8,7 +7,7 @@ fn main() {
     let rng = &mut OsRng {};
     let secret = Secret::new(rng);
     let n = 2;
-    let ring = Ring::decompress(&point::vec_1d::to_bytes(&point::vec_1d::random(n))).unwrap();
+    let ring = Ring::random(n - 1);
     let data = "hello world";
     let sag = SAG::sign::<Sha512>(rng, &secret, ring, data).unwrap();
     println!("{:?}", sag);

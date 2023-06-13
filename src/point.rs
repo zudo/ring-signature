@@ -19,29 +19,3 @@ pub fn from_hash<Hash: Digest<OutputSize = U64>>(hash: Hash) -> RistrettoPoint {
 pub fn hash<Hash: Digest<OutputSize = U64>>(point: RistrettoPoint) -> RistrettoPoint {
     from_hash(Hash::new().chain_update(point.compress().as_bytes()))
 }
-pub mod vec_1d {
-    use curve25519_dalek::RistrettoPoint;
-    pub fn random(x: usize) -> Vec<RistrettoPoint> {
-        (0..x).map(|_| super::random()).collect()
-    }
-    pub fn to_bytes(vec: &Vec<RistrettoPoint>) -> Vec<[u8; 32]> {
-        vec.iter().map(|x| x.compress().to_bytes()).collect()
-    }
-    pub fn from_slice(vec: &Vec<[u8; 32]>) -> Option<Vec<RistrettoPoint>> {
-        vec.iter().map(super::from_slice).collect()
-    }
-}
-pub mod vec_2d {
-    use curve25519_dalek::RistrettoPoint;
-    pub fn random(x: usize, y: usize) -> Vec<Vec<RistrettoPoint>> {
-        (0..x)
-            .map(|_| (0..y).map(|_| super::random()).collect())
-            .collect()
-    }
-    pub fn to_bytes(vec: &Vec<Vec<RistrettoPoint>>) -> Vec<Vec<[u8; 32]>> {
-        vec.iter().map(super::vec_1d::to_bytes).collect()
-    }
-    pub fn from_slice(vec: &Vec<Vec<[u8; 32]>>) -> Option<Vec<Vec<RistrettoPoint>>> {
-        vec.iter().map(super::vec_1d::from_slice).collect()
-    }
-}

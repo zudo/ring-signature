@@ -1,4 +1,3 @@
-use crate::point;
 use crate::scalar;
 use crate::Ring;
 use crate::Secret;
@@ -66,7 +65,7 @@ impl SAG {
         Some(SAG {
             challenge: challenges[0].to_bytes(),
             responses: scalar::vec_1d::to_bytes(&responses),
-            ring: point::vec_1d::to_bytes(&ring.0),
+            ring: ring.compress(),
         })
     }
     pub fn verify<Hash: Digest<OutputSize = U64> + Clone>(&self, data: impl AsRef<[u8]>) -> bool {
@@ -74,7 +73,7 @@ impl SAG {
         let challenge_0 = scalar::from_slice(&self.challenge);
         let mut challenge_1 = challenge_0;
         let responses = scalar::vec_1d::from_slice(&self.responses);
-        let ring = match point::vec_1d::from_slice(&self.ring) {
+        let ring = match Ring::decompress(&self.ring) {
             Some(x) => x,
             None => return false,
         };
@@ -83,7 +82,7 @@ impl SAG {
             hash.update(
                 RistrettoPoint::multiscalar_mul(
                     &[responses[i], challenge_1],
-                    &[constants::RISTRETTO_BASEPOINT_POINT, ring[i]],
+                    &[constants::RISTRETTO_BASEPOINT_POINT, ring.0[i]],
                 )
                 .compress()
                 .as_bytes(),
@@ -96,7 +95,6 @@ impl SAG {
 #[cfg(test)]
 pub mod test {
     use super::*;
-    use crate::point;
     use rand_core::OsRng;
     use sha2::Sha512;
     #[test]
@@ -105,8 +103,7 @@ pub mod test {
         let secret = Secret::new(rng);
         let data = b"hello world";
         for n in 2..11 {
-            let ring =
-                Ring::decompress(&point::vec_1d::to_bytes(&point::vec_1d::random(n - 1))).unwrap();
+            let ring = Ring::random(n - 1);
             let sag = SAG::sign::<Sha512>(rng, &secret, ring, data).unwrap();
             assert!((sag.verify::<Sha512>(data)));
         }

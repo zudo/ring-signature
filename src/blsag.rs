@@ -1,5 +1,6 @@
 use crate::point;
 use crate::scalar;
+use crate::Responses;
 use crate::Ring;
 use crate::Secret;
 use curve25519_dalek::constants;
@@ -82,7 +83,7 @@ impl BLSAG {
         Some(BLSAG {
             challenge: challenges[0].to_bytes(),
             responses: scalar::vec_1d::to_bytes(&responses),
-            ring: point::vec_1d::to_bytes(&ring.0),
+            ring: ring.compress(),
             key_image: key_image.compress().to_bytes(),
         })
     }
@@ -90,8 +91,11 @@ impl BLSAG {
         let hash = Hash::new().chain_update(data);
         let challenge_0 = scalar::from_slice(&self.challenge);
         let mut challenge_1 = challenge_0;
-        let responses = scalar::vec_1d::from_slice(&self.responses);
-        let ring = match point::vec_1d::from_slice(&self.ring) {
+        let responses = match Responses::from_canonical(&self.responses) {
+            Some(x) => x,
+            None => return false,
+        };
+        let ring = match Ring::decompress(&self.ring) {
             Some(x) => x,
             None => return false,
         };
@@ -103,15 +107,15 @@ impl BLSAG {
             let mut hash = hash.clone();
             hash.update(
                 RistrettoPoint::multiscalar_mul(
-                    &[responses[i], challenge_1],
-                    &[constants::RISTRETTO_BASEPOINT_POINT, ring[i]],
+                    &[responses.0[i], challenge_1],
+                    &[constants::RISTRETTO_BASEPOINT_POINT, ring.0[i]],
                 )
                 .compress()
                 .as_bytes(),
             );
             hash.update(
                 RistrettoPoint::multiscalar_mul(
-                    &[responses[i], challenge_1],
+                    &[responses.0[i], challenge_1],
                     &[
                         point::from_hash(Hash::new().chain_update(self.ring[i])),
                         key_image,
@@ -154,10 +158,8 @@ mod test {
         let data_0 = b"hello";
         let data_1 = b"world";
         for n in 2..11 {
-            let ring_0 =
-                Ring::decompress(&point::vec_1d::to_bytes(&point::vec_1d::random(n - 1))).unwrap();
-            let ring_1 =
-                Ring::decompress(&point::vec_1d::to_bytes(&point::vec_1d::random(n - 1))).unwrap();
+            let ring_0 = Ring::random(n - 1);
+            let ring_1 = Ring::random(n - 1);
             let blsag_0 =
                 BLSAG::sign::<Sha512>(rng, &secret_key_0, ring_0.clone(), data_0).unwrap();
             let blsag_1 = BLSAG::sign::<Sha512>(rng, &secret_key_0, ring_1, data_1).unwrap();

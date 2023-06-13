@@ -1,5 +1,7 @@
 use crate::point;
 use crate::scalar;
+use crate::Responses2d;
+use crate::Ring;
 use crate::Rings;
 use crate::Secret;
 use curve25519_dalek::constants;
@@ -32,13 +34,11 @@ impl MLSAG {
             .iter()
             .map(|x| x.0 * constants::RISTRETTO_BASEPOINT_POINT)
             .collect::<Vec<_>>();
-        let key_images: Vec<RistrettoPoint> = MLSAG::image::<Hash>(secrets);
+        let key_images = MLSAG::image::<Hash>(secrets);
         let secret_index = rng.gen_range(0..nr);
         rings.0.insert(secret_index, k_points.clone());
         let a: Vec<Scalar> = (0..nc).map(|_| scalar::random(rng)).collect();
-        let mut rs: Vec<Vec<Scalar>> = (0..nr)
-            .map(|_| (0..nc).map(|_| scalar::random(rng)).collect())
-            .collect();
+        let mut rs = Responses2d::random(rng, nr, nc);
         let mut cs: Vec<Scalar> = (0..nr).map(|_| scalar::zero()).collect();
         let mut hash = Hash::new();
         hash.update(message);
@@ -61,7 +61,7 @@ impl MLSAG {
             for j in 0..nc {
                 hashes[(i + 1) % nr].update(
                     RistrettoPoint::multiscalar_mul(
-                        &[rs[i % nr][j], cs[i % nr]],
+                        &[rs.0[i % nr][j], cs[i % nr]],
                         &[constants::RISTRETTO_BASEPOINT_POINT, rings.0[i % nr][j]],
                     )
                     .compress()
@@ -69,8 +69,8 @@ impl MLSAG {
                 );
                 hashes[(i + 1) % nr].update(
                     RistrettoPoint::multiscalar_mul(
-                        &[rs[i % nr][j], cs[i % nr]],
-                        &[point::hash::<Hash>(rings.0[i % nr][j]), key_images[j]],
+                        &[rs.0[i % nr][j], cs[i % nr]],
+                        &[point::hash::<Hash>(rings.0[i % nr][j]), key_images.0[j]],
                     )
                     .compress()
                     .as_bytes(),
@@ -86,21 +86,21 @@ impl MLSAG {
             }
         }
         for j in 0..nc {
-            rs[secret_index][j] = a[j] - (cs[secret_index] * secrets[j].0);
+            rs.0[secret_index][j] = a[j] - (cs[secret_index] * secrets[j].0);
         }
         Some(MLSAG {
             challenge: cs[0].to_bytes(),
-            responses: scalar::vec_2d::to_bytes(&rs),
-            ring: point::vec_2d::to_bytes(&rings.0),
-            key_images: key_images.iter().map(|x| x.compress().to_bytes()).collect(),
+            responses: rs.to_bytes(),
+            ring: rings.compress(),
+            key_images: key_images.compress(),
         })
     }
     pub fn verify<Hash: Digest<OutputSize = U64> + Clone>(&self, message: &Vec<u8>) -> bool {
-        let rings_0 = match point::vec_2d::from_slice(&self.ring) {
+        let rings = match Rings::decompress(&self.ring) {
             Some(x) => x,
             None => return false,
         };
-        let key_images = match point::vec_1d::from_slice(&self.key_images) {
+        let key_images = match Ring::decompress(&self.key_images) {
             Some(x) => x,
             None => return false,
         };
@@ -116,7 +116,7 @@ impl MLSAG {
                 hash.update(
                     RistrettoPoint::multiscalar_mul(
                         &[responses[i][j], challenge_1],
-                        &[constants::RISTRETTO_BASEPOINT_POINT, rings_0[i][j]],
+                        &[constants::RISTRETTO_BASEPOINT_POINT, rings.0[i][j]],
                     )
                     .compress()
                     .as_bytes(),
@@ -124,7 +124,7 @@ impl MLSAG {
                 hash.update(
                     RistrettoPoint::multiscalar_mul(
                         &[responses[i][j], challenge_1],
-                        &[point::hash::<Hash>(rings_0[i][j]), key_images[j]],
+                        &[point::hash::<Hash>(rings.0[i][j]), key_images.0[j]],
                     )
                     .compress()
                     .as_bytes(),
@@ -134,15 +134,17 @@ impl MLSAG {
         }
         challenge_0 == challenge_1
     }
-    pub fn image<Hash: Digest<OutputSize = U64>>(secrets: &[Secret]) -> Vec<RistrettoPoint> {
+    pub fn image<Hash: Digest<OutputSize = U64>>(secrets: &[Secret]) -> Ring {
         let nc = secrets.len();
         let publics = secrets
             .iter()
             .map(|x| x.0 * constants::RISTRETTO_BASEPOINT_POINT)
             .collect::<Vec<_>>();
-        (0..nc)
-            .map(|i| secrets[i].0 * point::hash::<Hash>(publics[i]))
-            .collect()
+        Ring(
+            (0..nc)
+                .map(|i| secrets[i].0 * point::hash::<Hash>(publics[i]))
+                .collect(),
+        )
     }
     pub fn link(key_images: &[Vec<[u8; 32]>]) -> bool {
         if key_images.is_empty() || key_images[0].is_empty() {
@@ -165,14 +167,7 @@ mod test {
         let nr = 2;
         let nc = 2;
         let secrets = (0..nc).map(|_| Secret::new(rng)).collect::<Vec<_>>();
-        let rings: Vec<Vec<[u8; 32]>> = (0..(nr - 1))
-            .map(|_| {
-                (0..nc)
-                    .map(|_| point::random().compress().to_bytes())
-                    .collect()
-            })
-            .collect();
-        let rings = Rings::decompress(&rings).unwrap();
+        let rings = Rings::random(nr - 1, nc);
         let message: Vec<u8> = b"This is the message".iter().cloned().collect();
         let mlsag = MLSAG::sign::<Sha512>(rng, &secrets, rings.clone(), &message).unwrap();
         let result = mlsag.verify::<Sha512>(&message);
