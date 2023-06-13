@@ -145,8 +145,15 @@ impl Images {
         ))
     }
     pub fn new<Hash: Digest<OutputSize = U64>>(secrets: &[Secret]) -> Images {
-        let a = secrets[0].0 * RISTRETTO_BASEPOINT_POINT;
-        let b = point::hash::<Hash>(a);
-        Images(secrets.iter().map(|x| x.0 * b).collect())
+        Images(
+            secrets
+                .iter()
+                .map(|secret| {
+                    let a = secrets[0].0 * RISTRETTO_BASEPOINT_POINT;
+                    let b = point::hash::<Hash>(a);
+                    secret.0 * b
+                })
+                .collect(),
+        )
     }
 }
