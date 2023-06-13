@@ -82,7 +82,7 @@ impl BLSAG {
             challenge: challenges[0].to_bytes(),
             responses: responses.to_bytes(),
             ring: ring.compress(),
-            key_image: key_image.0.compress().to_bytes(),
+            key_image: key_image.compress(),
         })
     }
     pub fn verify<Hash: Digest<OutputSize = U64> + Clone>(&self, data: impl AsRef<[u8]>) -> bool {

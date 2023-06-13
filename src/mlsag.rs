@@ -1,6 +1,6 @@
 use crate::point;
 use crate::scalar;
-use crate::PointVec;
+use crate::KeyImageVec;
 use crate::PointVec2D;
 use crate::ScalarVec2D;
 use crate::Secret;
@@ -101,7 +101,7 @@ impl MLSAG {
             Some(x) => x,
             None => return false,
         };
-        let key_images = match PointVec::decompress(&self.key_images) {
+        let key_images = match KeyImageVec::decompress(&self.key_images) {
             Some(x) => x,
             None => return false,
         };
@@ -141,13 +141,13 @@ impl MLSAG {
         }
         challenge_0 == challenge_1
     }
-    pub fn image<Hash: Digest<OutputSize = U64>>(secrets: &[Secret]) -> PointVec {
+    pub fn image<Hash: Digest<OutputSize = U64>>(secrets: &[Secret]) -> KeyImageVec {
         let nc = secrets.len();
         let publics = secrets
             .iter()
             .map(|x| x.0 * constants::RISTRETTO_BASEPOINT_POINT)
             .collect::<Vec<_>>();
-        PointVec(
+        KeyImageVec(
             (0..nc)
                 .map(|i| secrets[i].0 * point::hash::<Hash>(publics[i]))
                 .collect(),

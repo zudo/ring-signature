@@ -133,6 +133,17 @@ impl KeyImage {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct KeyImageVec(Vec<RistrettoPoint>);
 impl KeyImageVec {
+    pub fn compress(&self) -> Vec<[u8; 32]> {
+        self.0.iter().map(|x| x.compress().to_bytes()).collect()
+    }
+    pub fn decompress(bytes: &Vec<[u8; 32]>) -> Option<KeyImageVec> {
+        Some(KeyImageVec(
+            bytes
+                .iter()
+                .map(|x| point::from_slice(x))
+                .collect::<Option<Vec<_>>>()?,
+        ))
+    }
     pub fn new<Hash: Digest<OutputSize = U64>>(secrets: &[Secret]) -> KeyImageVec {
         let a = secrets[0].0 * RISTRETTO_BASEPOINT_POINT;
         let b = point::hash::<Hash>(a);
