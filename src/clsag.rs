@@ -247,16 +247,20 @@ mod tests {
         let secrets = (0..ring_layers)
             .map(|_| Secret::new(rng))
             .collect::<Vec<_>>();
+        let other_secrets = (0..ring_layers)
+            .map(|_| Secret::new(rng))
+            .collect::<Vec<_>>();
         let data_0 = b"hello";
         let data_1 = b"world";
         let ring_0 = Rings::random(ring_size - 1, ring_layers);
         let ring_1 = Rings::random(ring_size - 1, ring_layers);
         let blsag_0 = CLSAG::sign::<Sha512>(rng, &secrets, ring_0, data_0).unwrap();
-        let blsag_1 = CLSAG::sign::<Sha512>(rng, &secrets, ring_1, data_1).unwrap();
+        let blsag_1 = CLSAG::sign::<Sha512>(rng, &secrets, ring_1.clone(), data_1).unwrap();
+        let blsag_2 = CLSAG::sign::<Sha512>(rng, &other_secrets, ring_1, data_1).unwrap();
         assert!((blsag_0.verify::<Sha512>(data_0)));
         assert!((blsag_1.verify::<Sha512>(data_1)));
-        println!("{:?}", blsag_0.images);
-        println!("{:?}", blsag_1.images);
+        assert!((blsag_2.verify::<Sha512>(data_1)));
         assert!((CLSAG::link(&[&blsag_0.images, &blsag_1.images])));
+        assert!((!CLSAG::link(&[&blsag_1.images, &blsag_2.images])));
     }
 }
