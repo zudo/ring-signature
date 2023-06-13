@@ -23,17 +23,16 @@ impl BLSAG {
     pub fn sign<Hash: Digest<OutputSize = U64> + Clone>(
         rng: &mut impl CryptoRngCore,
         secret: &Secret,
-        ring: Ring,
+        mut ring: Ring,
         data: impl AsRef<[u8]>,
     ) -> Option<BLSAG> {
         let key_image = BLSAG::key_image::<Hash>(secret.0);
-        let mut ring_0 = ring.0;
-        let secret_index = rng.gen_range(0..=ring_0.len());
-        ring_0.insert(
+        let secret_index = rng.gen_range(0..=ring.0.len());
+        ring.0.insert(
             secret_index,
             secret.0 * constants::RISTRETTO_BASEPOINT_POINT,
         );
-        let ring_size = ring_0.len();
+        let ring_size = ring.0.len();
         let hash = Hash::new().chain_update(data);
         let mut hashes = (0..ring_size).map(|_| hash.clone()).collect::<Vec<_>>();
         let mut current_index = (secret_index + 1) % ring_size;
@@ -44,7 +43,7 @@ impl BLSAG {
                 .as_bytes(),
         );
         hashes[current_index].update(
-            (secret_scalar_1 * point::hash::<Hash>(ring_0[secret_index]))
+            (secret_scalar_1 * point::hash::<Hash>(ring.0[secret_index]))
                 .compress()
                 .as_bytes(),
         );
@@ -58,7 +57,7 @@ impl BLSAG {
             hashes[next_index].update(
                 RistrettoPoint::multiscalar_mul(
                     &[responses[current_index], challenges[current_index]],
-                    &[constants::RISTRETTO_BASEPOINT_POINT, ring_0[current_index]],
+                    &[constants::RISTRETTO_BASEPOINT_POINT, ring.0[current_index]],
                 )
                 .compress()
                 .as_bytes(),
@@ -66,7 +65,7 @@ impl BLSAG {
             hashes[next_index].update(
                 RistrettoPoint::multiscalar_mul(
                     &[responses[current_index], challenges[current_index]],
-                    &[point::hash::<Hash>(ring_0[current_index]), key_image],
+                    &[point::hash::<Hash>(ring.0[current_index]), key_image],
                 )
                 .compress()
                 .as_bytes(),
@@ -83,7 +82,7 @@ impl BLSAG {
         Some(BLSAG {
             challenge: challenges[0].to_bytes(),
             responses: scalar::vec_1d::to_bytes(&responses),
-            ring: point::vec_1d::to_bytes(&ring_0),
+            ring: point::vec_1d::to_bytes(&ring.0),
             key_image: key_image.compress().to_bytes(),
         })
     }

@@ -23,20 +23,19 @@ impl CLSAG {
     pub fn sign<Hash: Digest<OutputSize = U64> + Clone>(
         rng: &mut impl CryptoRngCore,
         secrets: &[Secret],
-        rings: Rings,
+        mut rings: Rings,
         data: impl AsRef<[u8]>,
     ) -> Option<CLSAG> {
         let key_images = CLSAG::key_image::<Hash>(secrets);
-        let mut rings = rings.0;
         let public_points = secrets
             .iter()
             .map(|x| x.0 * constants::RISTRETTO_BASEPOINT_POINT)
             .collect::<Vec<_>>();
         let base_point = point::hash::<Hash>(public_points[0]);
-        let secret_index = rng.gen_range(0..=rings.len());
-        rings.insert(secret_index, public_points);
-        let ring_size = rings.len();
-        let ring_layers = rings[0].len();
+        let secret_index = rng.gen_range(0..=rings.0.len());
+        rings.0.insert(secret_index, public_points);
+        let ring_size = rings.0.len();
+        let ring_layers = rings.0[0].len();
         let prefixed_hashes_with_key_images =
             CLSAG::prefixed_hashes_with_key_images::<Hash>(&rings, &key_images);
         let aggregate_private_key =
@@ -54,7 +53,7 @@ impl CLSAG {
                 hash.update(format!("CLSAG_c"));
                 for i in 0..ring_size {
                     for j in 0..ring_layers {
-                        hash.update(rings[i][j].compress().as_bytes());
+                        hash.update(rings.0[i][j].compress().as_bytes());
                     }
                 }
                 hash.update(&data);
@@ -97,7 +96,7 @@ impl CLSAG {
                         challenges[current_index % ring_size],
                     ],
                     &[
-                        point::hash::<Hash>(rings[current_index % ring_size][0]),
+                        point::hash::<Hash>(rings.0[current_index % ring_size][0]),
                         aggregate_key_image,
                     ],
                 )
@@ -117,7 +116,7 @@ impl CLSAG {
         Some(CLSAG {
             challenge: challenges[0].to_bytes(),
             responses: scalar::vec_1d::to_bytes(&responses),
-            rings: point::vec_2d::to_bytes(&rings),
+            rings: point::vec_2d::to_bytes(&rings.0),
             key_images: point::vec_1d::to_bytes(&key_images),
         })
     }
@@ -125,7 +124,7 @@ impl CLSAG {
         let ring_size = self.rings.len();
         let ring_layers = self.rings[0].len();
         let rings = match point::vec_2d::from_slice(&self.rings) {
-            Some(x) => x,
+            Some(x) => Rings(x),
             None => return false,
         };
         let key_images = match point::vec_1d::from_slice(&self.key_images) {
@@ -149,7 +148,7 @@ impl CLSAG {
             hash.update(format!("CLSAG_c"));
             for j in 0..ring_size {
                 for k in 0..ring_layers {
-                    hash.update(rings[j][k].compress().as_bytes());
+                    hash.update(rings.0[j][k].compress().as_bytes());
                 }
             }
             hash.update(&data);
@@ -167,7 +166,7 @@ impl CLSAG {
             hash.update(
                 RistrettoPoint::multiscalar_mul(
                     &[responses[i], challenge_1],
-                    &[point::hash::<Hash>(rings[i][0]), aggregate_key_image],
+                    &[point::hash::<Hash>(rings.0[i][0]), aggregate_key_image],
                 )
                 .compress()
                 .as_bytes(),
@@ -191,18 +190,18 @@ impl CLSAG {
             .all(|x| !x.is_empty() && x[0] == key_images[0][0])
     }
     fn prefixed_hashes_with_key_images<Hash: Digest<OutputSize = U64>>(
-        rings: &Vec<Vec<RistrettoPoint>>,
+        rings: &Rings,
         key_images: &Vec<RistrettoPoint>,
     ) -> Vec<Hash> {
-        let ring_size = rings.len();
-        let ring_layers = rings[0].len();
+        let ring_size = rings.0.len();
+        let ring_layers = rings.0[0].len();
         (0..ring_layers)
             .map(|i| {
                 let mut hash = Hash::new();
                 hash.update(format!("CLSAG_{}", i));
                 for j in 0..ring_size {
                     for k in 0..ring_layers {
-                        hash.update(rings[j][k].compress().as_bytes());
+                        hash.update(rings.0[j][k].compress().as_bytes());
                     }
                 }
                 for j in 0..ring_layers {
@@ -213,37 +212,38 @@ impl CLSAG {
             .collect()
     }
     fn aggregate_private_key<Hash: Digest<OutputSize = U64> + Clone>(
-        rings: &Vec<Vec<RistrettoPoint>>,
+        rings: &Rings,
         prefixed_hashes_with_key_images: &Vec<Hash>,
         secrets: &[Secret],
     ) -> Scalar {
-        let ring_layers = rings[0].len();
+        let ring_layers = rings.0[0].len();
         (0..ring_layers)
             .map(|i| scalar::from_hash(prefixed_hashes_with_key_images[i].clone()) * secrets[i].0)
             .sum()
     }
     fn aggregate_public_keys<Hash: Digest<OutputSize = U64> + Clone>(
-        rings: &Vec<Vec<RistrettoPoint>>,
+        rings: &Rings,
         prefixed_hashes_with_key_images: &Vec<Hash>,
     ) -> Vec<RistrettoPoint> {
-        let ring_size = rings.len();
-        let ring_layers = rings[0].len();
+        let ring_size = rings.0.len();
+        let ring_layers = rings.0[0].len();
         (0..ring_size)
             .map(|i| {
                 (0..ring_layers)
                     .map(|j| {
-                        scalar::from_hash(prefixed_hashes_with_key_images[j].clone()) * rings[i][j]
+                        scalar::from_hash(prefixed_hashes_with_key_images[j].clone())
+                            * rings.0[i][j]
                     })
                     .sum()
             })
             .collect()
     }
     fn aggregate_key_image<Hash: Digest<OutputSize = U64> + Clone>(
-        rings: &Vec<Vec<RistrettoPoint>>,
+        rings: &Rings,
         prefixed_hashes_with_key_images: &Vec<Hash>,
         key_images: &Vec<RistrettoPoint>,
     ) -> RistrettoPoint {
-        let ring_layers = rings[0].len();
+        let ring_layers = rings.0[0].len();
         (0..ring_layers)
             .map(|i| scalar::from_hash(prefixed_hashes_with_key_images[i].clone()) * key_images[i])
             .sum()

@@ -21,16 +21,15 @@ impl SAG {
     pub fn sign<Hash: Digest<OutputSize = U64> + Clone>(
         rng: &mut impl CryptoRngCore,
         secret: &Secret,
-        ring: Ring,
+        mut ring: Ring,
         data: impl AsRef<[u8]>,
     ) -> Option<SAG> {
-        let mut ring_0 = ring.0;
-        let secret_index = rng.gen_range(0..=ring_0.len());
-        ring_0.insert(
+        let secret_index = rng.gen_range(0..=ring.0.len());
+        ring.0.insert(
             secret_index,
             secret.0 * constants::RISTRETTO_BASEPOINT_POINT,
         );
-        let ring_size = ring_0.len();
+        let ring_size = ring.0.len();
         let hash = Hash::new().chain_update(data);
         let mut hashes = (0..ring_size).map(|_| hash.clone()).collect::<Vec<_>>();
         let mut current_index = (secret_index + 1) % ring_size;
@@ -50,7 +49,7 @@ impl SAG {
             hashes[next_index].update(
                 RistrettoPoint::multiscalar_mul(
                     &[responses[current_index], challenges[current_index]],
-                    &[constants::RISTRETTO_BASEPOINT_POINT, ring_0[current_index]],
+                    &[constants::RISTRETTO_BASEPOINT_POINT, ring.0[current_index]],
                 )
                 .compress()
                 .as_bytes(),
@@ -67,7 +66,7 @@ impl SAG {
         Some(SAG {
             challenge: challenges[0].to_bytes(),
             responses: scalar::vec_1d::to_bytes(&responses),
-            ring: point::vec_1d::to_bytes(&ring_0),
+            ring: point::vec_1d::to_bytes(&ring.0),
         })
     }
     pub fn verify<Hash: Digest<OutputSize = U64> + Clone>(&self, data: impl AsRef<[u8]>) -> bool {
