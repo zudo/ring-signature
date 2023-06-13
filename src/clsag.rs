@@ -237,30 +237,42 @@ impl CLSAG {
 mod tests {
     use super::*;
     use crate::Rings;
+    use lazy_static::lazy_static;
     use rand_core::OsRng;
     use sha2::Sha512;
+    const DATA_0: &[u8] = b"hello from";
+    const DATA_1: &str = "zudo";
+    const X: usize = 2;
+    const Y: usize = 2;
+    lazy_static! {
+        static ref SECRETS_0: Vec<Secret> = (0..Y).map(|_| Secret::new(&mut OsRng {})).collect();
+        static ref SECRETS_1: Vec<Secret> = (0..Y).map(|_| Secret::new(&mut OsRng {})).collect();
+        static ref RINGS_0: Rings = Rings::random(X, Y);
+        static ref RINGS_1: Rings = Rings::random(X, Y);
+    }
     #[test]
     fn sign_verify() {
         let rng = &mut OsRng {};
-        let ring_size = 2;
-        let ring_layers = 2;
-        let secrets = (0..ring_layers)
-            .map(|_| Secret::new(rng))
-            .collect::<Vec<_>>();
-        let other_secrets = (0..ring_layers)
-            .map(|_| Secret::new(rng))
-            .collect::<Vec<_>>();
-        let data_0 = b"hello";
-        let data_1 = b"world";
-        let ring_0 = Rings::random(ring_size - 1, ring_layers);
-        let ring_1 = Rings::random(ring_size - 1, ring_layers);
-        let blsag_0 = CLSAG::sign::<Sha512>(rng, &secrets, ring_0, data_0).unwrap();
-        let blsag_1 = CLSAG::sign::<Sha512>(rng, &secrets, ring_1.clone(), data_1).unwrap();
-        let blsag_2 = CLSAG::sign::<Sha512>(rng, &other_secrets, ring_1, data_1).unwrap();
-        assert!((blsag_0.verify::<Sha512>(data_0)));
-        assert!((blsag_1.verify::<Sha512>(data_1)));
-        assert!((blsag_2.verify::<Sha512>(data_1)));
-        assert!((CLSAG::link(&[&blsag_0.images, &blsag_1.images])));
-        assert!((!CLSAG::link(&[&blsag_1.images, &blsag_2.images])));
+        let a = CLSAG::sign::<Sha512>(rng, &SECRETS_0, RINGS_0.clone(), DATA_0).unwrap();
+        let b = CLSAG::sign::<Sha512>(rng, &SECRETS_0, RINGS_1.clone(), DATA_0).unwrap();
+        let c = CLSAG::sign::<Sha512>(rng, &SECRETS_1, RINGS_1.clone(), DATA_0).unwrap();
+        assert!((a.verify::<Sha512>(DATA_0)));
+        assert!((b.verify::<Sha512>(DATA_0)));
+        assert!((c.verify::<Sha512>(DATA_0)));
+    }
+    #[test]
+    fn link() {
+        let rng = &mut OsRng {};
+        let a = CLSAG::sign::<Sha512>(rng, &SECRETS_0, RINGS_0.clone(), DATA_1).unwrap();
+        let b = CLSAG::sign::<Sha512>(rng, &SECRETS_0, RINGS_1.clone(), DATA_0).unwrap();
+        let c = CLSAG::sign::<Sha512>(rng, &SECRETS_1, RINGS_0.clone(), DATA_0).unwrap();
+        let d = CLSAG::sign::<Sha512>(rng, &SECRETS_0, RINGS_1.clone(), DATA_1).unwrap();
+        let e = CLSAG::sign::<Sha512>(rng, &SECRETS_1, RINGS_0.clone(), DATA_1).unwrap();
+        let f = CLSAG::sign::<Sha512>(rng, &SECRETS_1, RINGS_1.clone(), DATA_1).unwrap();
+        assert!((CLSAG::link(&[&a.images, &b.images])));
+        assert!((!CLSAG::link(&[&a.images, &c.images])));
+        assert!((CLSAG::link(&[&a.images, &d.images])));
+        assert!((!CLSAG::link(&[&a.images, &e.images])));
+        assert!((!CLSAG::link(&[&a.images, &f.images])));
     }
 }
