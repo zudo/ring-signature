@@ -44,9 +44,9 @@ impl PointVec {
     pub fn compress(&self) -> Vec<[u8; 32]> {
         self.0.iter().map(|x| x.compress().to_bytes()).collect()
     }
-    pub fn decompress(ring: &Vec<[u8; 32]>) -> Option<PointVec> {
+    pub fn decompress(vec: &Vec<[u8; 32]>) -> Option<PointVec> {
         Some(PointVec(
-            ring.iter()
+            vec.iter()
                 .map(|x| point::from_slice(x))
                 .collect::<Option<Vec<_>>>()?,
         ))
@@ -64,9 +64,9 @@ impl PointVec2D {
             .map(|x| x.iter().map(|y| y.compress().to_bytes()).collect())
             .collect()
     }
-    pub fn decompress(rings: &Vec<Vec<[u8; 32]>>) -> Option<PointVec2D> {
+    pub fn decompress(vec_2d: &Vec<Vec<[u8; 32]>>) -> Option<PointVec2D> {
         Some(PointVec2D(
-            rings
+            vec_2d
                 .iter()
                 .map(|x| {
                     x.iter()
@@ -90,10 +90,9 @@ impl ScalarVec {
     pub fn to_bytes(&self) -> Vec<[u8; 32]> {
         self.0.iter().map(|x| x.to_bytes()).collect()
     }
-    pub fn from_canonical(responses: &Vec<[u8; 32]>) -> Option<ScalarVec> {
+    pub fn from_canonical(vec: &Vec<[u8; 32]>) -> Option<ScalarVec> {
         Some(ScalarVec(
-            responses
-                .iter()
+            vec.iter()
                 .map(|&x| scalar::from_canonical(x))
                 .collect::<Option<Vec<_>>>()?,
         ))
@@ -111,9 +110,9 @@ impl ScalarVec2D {
             .map(|x| x.iter().map(|y| y.to_bytes()).collect())
             .collect()
     }
-    pub fn from_canonical(responses: &Vec<Vec<[u8; 32]>>) -> Option<ScalarVec2D> {
+    pub fn from_canonical(vec_2d: &Vec<Vec<[u8; 32]>>) -> Option<ScalarVec2D> {
         Some(ScalarVec2D(
-            responses
+            vec_2d
                 .iter()
                 .map(|x| x.iter().map(|&y| scalar::from_canonical(y)).collect())
                 .collect::<Option<Vec<_>>>()?,
