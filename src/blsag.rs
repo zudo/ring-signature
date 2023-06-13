@@ -4,7 +4,7 @@ use crate::Image;
 use crate::Response;
 use crate::Ring;
 use crate::Secret;
-use curve25519_dalek::constants;
+use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::traits::MultiscalarMul;
 use digest::generic_array::typenum::U64;
@@ -29,22 +29,16 @@ impl BLSAG {
     ) -> Option<BLSAG> {
         let image = Image::new::<Hash>(secret);
         let secret_index = rng.gen_range(0..=ring.0.len());
-        ring.0.insert(
-            secret_index,
-            secret.0 * constants::RISTRETTO_BASEPOINT_POINT,
-        );
+        ring.0
+            .insert(secret_index, secret.0 * RISTRETTO_BASEPOINT_POINT);
         let ring_size = ring.0.len();
         let hash = Hash::new().chain_update(data);
         let mut hashes = (0..ring_size).map(|_| hash.clone()).collect::<Vec<_>>();
         let mut current_index = (secret_index + 1) % ring_size;
-        let secret_scalar_1 = scalar::random(rng);
+        let r = scalar::random(rng);
+        hashes[current_index].update((r * RISTRETTO_BASEPOINT_POINT).compress().as_bytes());
         hashes[current_index].update(
-            (secret_scalar_1 * constants::RISTRETTO_BASEPOINT_POINT)
-                .compress()
-                .as_bytes(),
-        );
-        hashes[current_index].update(
-            (secret_scalar_1 * point::hash::<Hash>(ring.0[secret_index]))
+            (r * point::hash::<Hash>(ring.0[secret_index]))
                 .compress()
                 .as_bytes(),
         );
@@ -56,7 +50,7 @@ impl BLSAG {
             hashes[next_index].update(
                 RistrettoPoint::multiscalar_mul(
                     &[response.0[current_index], challenges[current_index]],
-                    &[constants::RISTRETTO_BASEPOINT_POINT, ring.0[current_index]],
+                    &[RISTRETTO_BASEPOINT_POINT, ring.0[current_index]],
                 )
                 .compress()
                 .as_bytes(),
@@ -77,7 +71,7 @@ impl BLSAG {
             }
             current_index = next_index;
         }
-        response.0[secret_index] = secret_scalar_1 - (challenges[secret_index] * secret.0);
+        response.0[secret_index] = r - (challenges[secret_index] * secret.0);
         Some(BLSAG {
             challenge: challenges[0].to_bytes(),
             response: response.to_bytes(),
@@ -98,7 +92,7 @@ impl BLSAG {
                 hash.update(
                     RistrettoPoint::multiscalar_mul(
                         &[response.0[i], challenge_1],
-                        &[constants::RISTRETTO_BASEPOINT_POINT, ring.0[i]],
+                        &[RISTRETTO_BASEPOINT_POINT, ring.0[i]],
                     )
                     .compress()
                     .as_bytes(),

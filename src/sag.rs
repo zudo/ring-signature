@@ -2,7 +2,7 @@ use crate::scalar;
 use crate::Response;
 use crate::Ring;
 use crate::Secret;
-use curve25519_dalek::constants;
+use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::traits::MultiscalarMul;
 use digest::typenum::U64;
@@ -25,17 +25,15 @@ impl SAG {
         data: impl AsRef<[u8]>,
     ) -> Option<SAG> {
         let secret_index = rng.gen_range(0..=ring.0.len());
-        ring.0.insert(
-            secret_index,
-            secret.0 * constants::RISTRETTO_BASEPOINT_POINT,
-        );
+        ring.0
+            .insert(secret_index, secret.0 * RISTRETTO_BASEPOINT_POINT);
         let ring_size = ring.0.len();
         let hash = Hash::new().chain_update(data);
         let mut hashes = (0..ring_size).map(|_| hash.clone()).collect::<Vec<_>>();
         let mut current_index = (secret_index + 1) % ring_size;
         let secret_scalar_1 = scalar::random(rng);
         hashes[current_index].update(
-            (secret_scalar_1 * constants::RISTRETTO_BASEPOINT_POINT)
+            (secret_scalar_1 * RISTRETTO_BASEPOINT_POINT)
                 .compress()
                 .as_bytes(),
         );
@@ -47,7 +45,7 @@ impl SAG {
             hashes[next_index].update(
                 RistrettoPoint::multiscalar_mul(
                     &[response.0[current_index], challenges[current_index]],
-                    &[constants::RISTRETTO_BASEPOINT_POINT, ring.0[current_index]],
+                    &[RISTRETTO_BASEPOINT_POINT, ring.0[current_index]],
                 )
                 .compress()
                 .as_bytes(),
@@ -79,7 +77,7 @@ impl SAG {
                 hash.update(
                     RistrettoPoint::multiscalar_mul(
                         &[response.0[i], challenge_1],
-                        &[constants::RISTRETTO_BASEPOINT_POINT, ring.0[i]],
+                        &[RISTRETTO_BASEPOINT_POINT, ring.0[i]],
                     )
                     .compress()
                     .as_bytes(),
