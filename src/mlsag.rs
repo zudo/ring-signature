@@ -1,7 +1,7 @@
 use crate::point;
 use crate::scalar;
-use crate::Ring;
-use crate::Rings;
+use crate::PointVec;
+use crate::PointVec2D;
 use crate::ScalarVec2D;
 use crate::Secret;
 use curve25519_dalek::constants;
@@ -25,7 +25,7 @@ impl MLSAG {
     pub fn sign<Hash: Digest<OutputSize = U64> + Clone>(
         rng: &mut impl CryptoRngCore,
         secrets: &[Secret],
-        mut rings: Rings,
+        mut rings: PointVec2D,
         message: impl AsRef<[u8]>,
     ) -> Option<MLSAG> {
         let nr = rings.0.len() + 1;
@@ -97,11 +97,11 @@ impl MLSAG {
         })
     }
     pub fn verify<Hash: Digest<OutputSize = U64> + Clone>(&self, message: &Vec<u8>) -> bool {
-        let rings = match Rings::decompress(&self.ring) {
+        let rings = match PointVec2D::decompress(&self.ring) {
             Some(x) => x,
             None => return false,
         };
-        let key_images = match Ring::decompress(&self.key_images) {
+        let key_images = match PointVec::decompress(&self.key_images) {
             Some(x) => x,
             None => return false,
         };
@@ -141,13 +141,13 @@ impl MLSAG {
         }
         challenge_0 == challenge_1
     }
-    pub fn image<Hash: Digest<OutputSize = U64>>(secrets: &[Secret]) -> Ring {
+    pub fn image<Hash: Digest<OutputSize = U64>>(secrets: &[Secret]) -> PointVec {
         let nc = secrets.len();
         let publics = secrets
             .iter()
             .map(|x| x.0 * constants::RISTRETTO_BASEPOINT_POINT)
             .collect::<Vec<_>>();
-        Ring(
+        PointVec(
             (0..nc)
                 .map(|i| secrets[i].0 * point::hash::<Hash>(publics[i]))
                 .collect(),
@@ -174,7 +174,7 @@ mod tests {
         let nr = 2;
         let nc = 2;
         let secrets = (0..nc).map(|_| Secret::new(rng)).collect::<Vec<_>>();
-        let rings = Rings::random(nr - 1, nc);
+        let rings = PointVec2D::random(nr - 1, nc);
         let message: Vec<u8> = b"This is the message".iter().cloned().collect();
         let mlsag = MLSAG::sign::<Sha512>(rng, &secrets, rings.clone(), &message).unwrap();
         let result = mlsag.verify::<Sha512>(&message);
@@ -186,7 +186,7 @@ mod tests {
                     .collect()
             })
             .collect();
-        let another_rings = Rings::decompress(&another_rings).unwrap();
+        let another_rings = PointVec2D::decompress(&another_rings).unwrap();
         let another_message: Vec<u8> = b"This is another message".iter().cloned().collect();
         let mlsag_1 =
             MLSAG::sign::<Sha512>(rng, &secrets, another_rings, &another_message).unwrap();

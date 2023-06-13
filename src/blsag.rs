@@ -1,6 +1,6 @@
 use crate::point;
 use crate::scalar;
-use crate::Ring;
+use crate::PointVec;
 use crate::ScalarVec;
 use crate::Secret;
 use curve25519_dalek::constants;
@@ -24,7 +24,7 @@ impl BLSAG {
     pub fn sign<Hash: Digest<OutputSize = U64> + Clone>(
         rng: &mut impl CryptoRngCore,
         secret: &Secret,
-        mut ring: Ring,
+        mut ring: PointVec,
         data: impl AsRef<[u8]>,
     ) -> Option<BLSAG> {
         let key_image = BLSAG::key_image::<Hash>(secret.0);
@@ -96,7 +96,7 @@ impl BLSAG {
             Some(x) => x,
             None => return false,
         };
-        let ring = match Ring::decompress(&self.ring) {
+        let ring = match PointVec::decompress(&self.ring) {
             Some(x) => x,
             None => return false,
         };
@@ -159,8 +159,8 @@ mod tests {
         let data_0 = b"hello";
         let data_1 = b"world";
         for n in 2..11 {
-            let ring_0 = Ring::random(n - 1);
-            let ring_1 = Ring::random(n - 1);
+            let ring_0 = PointVec::random(n - 1);
+            let ring_1 = PointVec::random(n - 1);
             let blsag_0 =
                 BLSAG::sign::<Sha512>(rng, &secret_key_0, ring_0.clone(), data_0).unwrap();
             let blsag_1 = BLSAG::sign::<Sha512>(rng, &secret_key_0, ring_1, data_1).unwrap();

@@ -1,7 +1,7 @@
 use rand_core::OsRng;
 use ring_signature::clsag::CLSAG;
 use ring_signature::point;
-use ring_signature::Rings;
+use ring_signature::PointVec2D;
 use ring_signature::Secret;
 use sha2::Sha512;
 fn main() {
@@ -13,7 +13,7 @@ fn main() {
         .collect::<Vec<_>>();
     let data_0 = b"hello";
     let data_1 = b"world";
-    let ring_0 = Rings::decompress(
+    let ring_0 = PointVec2D::decompress(
         &(0..(ring_size - 1))
             .map(|_| {
                 (0..ring_layers)
@@ -23,7 +23,7 @@ fn main() {
             .collect::<Vec<Vec<_>>>(),
     )
     .unwrap();
-    let ring_1 = Rings::decompress(
+    let ring_1 = PointVec2D::decompress(
         &(0..(ring_size - 1))
             .map(|_| {
                 (0..ring_layers)

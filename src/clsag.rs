@@ -1,7 +1,7 @@
 use crate::point;
 use crate::scalar;
-use crate::Ring;
-use crate::Rings;
+use crate::PointVec;
+use crate::PointVec2D;
 use crate::ScalarVec;
 use crate::Secret;
 use curve25519_dalek::constants;
@@ -25,7 +25,7 @@ impl CLSAG {
     pub fn sign<Hash: Digest<OutputSize = U64> + Clone>(
         rng: &mut impl CryptoRngCore,
         secrets: &[Secret],
-        mut rings: Rings,
+        mut rings: PointVec2D,
         data: impl AsRef<[u8]>,
     ) -> Option<CLSAG> {
         let key_images = CLSAG::key_image::<Hash>(secrets);
@@ -123,11 +123,11 @@ impl CLSAG {
     pub fn verify<Hash: Digest<OutputSize = U64> + Clone>(&self, data: impl AsRef<[u8]>) -> bool {
         let ring_size = self.rings.len();
         let ring_layers = self.rings[0].len();
-        let rings = match Rings::decompress(&self.rings) {
+        let rings = match PointVec2D::decompress(&self.rings) {
             Some(x) => x,
             None => return false,
         };
-        let key_images = match Ring::decompress(&self.key_images) {
+        let key_images = match PointVec::decompress(&self.key_images) {
             Some(x) => x,
             None => return false,
         };
@@ -181,10 +181,10 @@ impl CLSAG {
         }
         challenge_0 == challenge_1
     }
-    pub fn key_image<Hash: Digest<OutputSize = U64>>(secrets: &[Secret]) -> Ring {
+    pub fn key_image<Hash: Digest<OutputSize = U64>>(secrets: &[Secret]) -> PointVec {
         let a = secrets[0].0 * constants::RISTRETTO_BASEPOINT_POINT;
         let b = point::hash::<Hash>(a);
-        Ring(secrets.iter().map(|x| x.0 * b).collect())
+        PointVec(secrets.iter().map(|x| x.0 * b).collect())
     }
     pub fn link(key_images: &[&[[u8; 32]]]) -> bool {
         if key_images.is_empty() || key_images[0].is_empty() {
@@ -196,8 +196,8 @@ impl CLSAG {
             .all(|x| !x.is_empty() && x[0] == key_images[0][0])
     }
     fn prefixed_hashes_with_key_images<Hash: Digest<OutputSize = U64>>(
-        rings: &Rings,
-        key_images: &Ring,
+        rings: &PointVec2D,
+        key_images: &PointVec,
     ) -> Vec<Hash> {
         let ring_size = rings.0.len();
         let ring_layers = rings.0[0].len();
@@ -218,7 +218,7 @@ impl CLSAG {
             .collect()
     }
     fn aggregate_private_key<Hash: Digest<OutputSize = U64> + Clone>(
-        rings: &Rings,
+        rings: &PointVec2D,
         prefixed_hashes_with_key_images: &Vec<Hash>,
         secrets: &[Secret],
     ) -> Scalar {
@@ -228,7 +228,7 @@ impl CLSAG {
             .sum()
     }
     fn aggregate_public_keys<Hash: Digest<OutputSize = U64> + Clone>(
-        rings: &Rings,
+        rings: &PointVec2D,
         prefixed_hashes_with_key_images: &Vec<Hash>,
     ) -> Vec<RistrettoPoint> {
         let ring_size = rings.0.len();
@@ -245,9 +245,9 @@ impl CLSAG {
             .collect()
     }
     fn aggregate_key_image<Hash: Digest<OutputSize = U64> + Clone>(
-        rings: &Rings,
+        rings: &PointVec2D,
         prefixed_hashes_with_key_images: &Vec<Hash>,
-        key_images: &Ring,
+        key_images: &PointVec,
     ) -> RistrettoPoint {
         let ring_layers = rings.0[0].len();
         (0..ring_layers)
@@ -260,7 +260,7 @@ impl CLSAG {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Rings;
+    use crate::PointVec2D;
     use rand_core::OsRng;
     use sha2::Sha512;
     #[test]
@@ -273,8 +273,8 @@ mod tests {
             .collect::<Vec<_>>();
         let data_0 = b"hello";
         let data_1 = b"world";
-        let ring_0 = Rings::random(ring_size - 1, ring_layers);
-        let ring_1 = Rings::random(ring_size - 1, ring_layers);
+        let ring_0 = PointVec2D::random(ring_size - 1, ring_layers);
+        let ring_1 = PointVec2D::random(ring_size - 1, ring_layers);
         let blsag_0 = CLSAG::sign::<Sha512>(rng, &secrets, ring_0, data_0).unwrap();
         let blsag_1 = CLSAG::sign::<Sha512>(rng, &secrets, ring_1, data_1).unwrap();
         assert!((blsag_0.verify::<Sha512>(data_0)));

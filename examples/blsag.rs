@@ -1,6 +1,6 @@
 use rand_core::OsRng;
 use ring_signature::blsag::BLSAG;
-use ring_signature::Ring;
+use ring_signature::PointVec;
 use ring_signature::Secret;
 use sha2::Sha512;
 fn main() {
@@ -9,8 +9,8 @@ fn main() {
     let n = 2;
     let data_0 = b"hello";
     let data_1 = b"world";
-    let ring_0 = Ring::random(n - 1);
-    let ring_1 = Ring::random(n - 1);
+    let ring_0 = PointVec::random(n - 1);
+    let ring_1 = PointVec::random(n - 1);
     let blsag_0 = BLSAG::sign::<Sha512>(rng, &secret, ring_0, data_0).unwrap();
     let blsag_1 = BLSAG::sign::<Sha512>(rng, &secret, ring_1, data_1).unwrap();
     println!("{:?}", blsag_0);

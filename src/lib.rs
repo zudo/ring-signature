@@ -39,33 +39,33 @@ impl Secret {
     }
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Ring(Vec<RistrettoPoint>);
-impl Ring {
+pub struct PointVec(Vec<RistrettoPoint>);
+impl PointVec {
     pub fn compress(&self) -> Vec<[u8; 32]> {
         self.0.iter().map(|x| x.compress().to_bytes()).collect()
     }
-    pub fn decompress(ring: &Vec<[u8; 32]>) -> Option<Ring> {
-        Some(Ring(
+    pub fn decompress(ring: &Vec<[u8; 32]>) -> Option<PointVec> {
+        Some(PointVec(
             ring.iter()
                 .map(|x| point::from_slice(x))
                 .collect::<Option<Vec<_>>>()?,
         ))
     }
-    pub fn random(x: usize) -> Ring {
-        Ring((0..x).map(|_| point::random()).collect())
+    pub fn random(x: usize) -> PointVec {
+        PointVec((0..x).map(|_| point::random()).collect())
     }
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Rings(Vec<Vec<RistrettoPoint>>);
-impl Rings {
+pub struct PointVec2D(Vec<Vec<RistrettoPoint>>);
+impl PointVec2D {
     pub fn compress(&self) -> Vec<Vec<[u8; 32]>> {
         self.0
             .iter()
             .map(|x| x.iter().map(|y| y.compress().to_bytes()).collect())
             .collect()
     }
-    pub fn decompress(rings: &Vec<Vec<[u8; 32]>>) -> Option<Rings> {
-        Some(Rings(
+    pub fn decompress(rings: &Vec<Vec<[u8; 32]>>) -> Option<PointVec2D> {
+        Some(PointVec2D(
             rings
                 .iter()
                 .map(|x| {
@@ -76,8 +76,8 @@ impl Rings {
                 .collect::<Option<Vec<_>>>()?,
         ))
     }
-    pub fn random(x: usize, y: usize) -> Rings {
-        Rings(
+    pub fn random(x: usize, y: usize) -> PointVec2D {
+        PointVec2D(
             (0..x)
                 .map(|_| (0..y).map(|_| point::random()).collect())
                 .collect(),
