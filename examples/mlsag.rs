@@ -1,5 +1,5 @@
 use rand_core::OsRng;
-use ring_signature::clsag::CLSAG;
+use ring_signature::mlsag::MLSAG;
 use ring_signature::Rings;
 use ring_signature::Secret;
 use sha2::Sha512;
@@ -10,8 +10,8 @@ fn main() {
     let rng = &mut OsRng {};
     let secrets = (0..Y).map(|_| Secret::new(rng)).collect::<Vec<_>>();
     let ring = Rings::random(X - 1, Y);
-    let clsag = CLSAG::sign::<Sha512>(rng, &secrets, ring, DATA).unwrap();
-    println!("{:?}", clsag);
-    println!("Bytes: {}", bincode::serialize(&clsag).unwrap().len());
-    println!("Valid: {}", clsag.verify::<Sha512>(DATA));
+    let mlsag = MLSAG::sign::<Sha512>(rng, &secrets, ring, DATA).unwrap();
+    println!("{:?}", mlsag);
+    println!("Bytes: {}", bincode::serialize(&mlsag).unwrap().len());
+    println!("Valid: {}", mlsag.verify::<Sha512>(DATA));
 }
