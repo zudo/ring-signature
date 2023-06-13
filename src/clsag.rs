@@ -258,7 +258,7 @@ impl CLSAG {
     }
 }
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
     use crate::Rings;
     use rand_core::OsRng;

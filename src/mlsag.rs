@@ -164,7 +164,7 @@ impl MLSAG {
     }
 }
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
     use rand_core::OsRng;
     use sha2::Sha512;

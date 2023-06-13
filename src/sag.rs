@@ -98,7 +98,7 @@ impl SAG {
     }
 }
 #[cfg(test)]
-pub mod test {
+pub mod tests {
     use super::*;
     use rand_core::OsRng;
     use sha2::Sha512;
