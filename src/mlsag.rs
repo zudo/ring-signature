@@ -1,5 +1,8 @@
-use crate::point;
-use crate::scalar;
+use crate::point_hash;
+use crate::scalar_from_canonical;
+use crate::scalar_from_hash;
+use crate::scalar_random;
+use crate::scalar_zero;
 use crate::Images;
 use crate::Responses;
 use crate::Rings;
@@ -37,9 +40,9 @@ impl MLSAG {
         let images = MLSAG::image::<Hash>(secrets);
         let secret_index = rng.gen_range(0..nr);
         rings.0.insert(secret_index, k_points.clone());
-        let a: Vec<Scalar> = (0..nc).map(|_| scalar::random(rng)).collect();
+        let a: Vec<Scalar> = (0..nc).map(|_| scalar_random(rng)).collect();
         let mut responses = Responses::random(rng, nr, nc);
-        let mut challenges: Vec<Scalar> = (0..nr).map(|_| scalar::zero()).collect();
+        let mut challenges: Vec<Scalar> = (0..nr).map(|_| scalar_zero()).collect();
         let mut hash = Hash::new();
         hash.update(message);
         let mut hashes: Vec<Hash> = (0..nr).map(|_| hash.clone()).collect();
@@ -47,13 +50,13 @@ impl MLSAG {
             hashes[(secret_index + 1) % nr]
                 .update((a[j] * RISTRETTO_BASEPOINT_POINT).compress().as_bytes());
             hashes[(secret_index + 1) % nr].update(
-                (a[j] * point::hash::<Hash>(k_points[j]))
+                (a[j] * point_hash::<Hash>(k_points[j]))
                     .compress()
                     .as_bytes(),
             );
         }
         challenges[(secret_index + 1) % nr] =
-            scalar::from_hash(hashes[(secret_index + 1) % nr].clone());
+            scalar_from_hash(hashes[(secret_index + 1) % nr].clone());
         let mut i = (secret_index + 1) % nr;
         loop {
             for j in 0..nc {
@@ -68,13 +71,13 @@ impl MLSAG {
                 hashes[(i + 1) % nr].update(
                     RistrettoPoint::multiscalar_mul(
                         &[responses.0[i % nr][j], challenges[i % nr]],
-                        &[point::hash::<Hash>(rings.0[i % nr][j]), images.0[j]],
+                        &[point_hash::<Hash>(rings.0[i % nr][j]), images.0[j]],
                     )
                     .compress()
                     .as_bytes(),
                 );
             }
-            challenges[(i + 1) % nr] = scalar::from_hash(hashes[(i + 1) % nr].clone());
+            challenges[(i + 1) % nr] = scalar_from_hash(hashes[(i + 1) % nr].clone());
             if secret_index >= 1 && i % nr == (secret_index - 1) % nr {
                 break;
             } else if secret_index == 0 && i % nr == nr - 1 {
@@ -98,7 +101,7 @@ impl MLSAG {
             let rings = Rings::decompress(&self.ring)?;
             let images = Images::decompress(&self.images)?;
             let responses = Responses::from_canonical(&self.responses)?;
-            let challenge_0 = scalar::from_canonical(self.challenge)?;
+            let challenge_0 = scalar_from_canonical(self.challenge)?;
             let mut challenge_1 = challenge_0;
             let nr = self.ring.len();
             let nc = self.ring[0].len();
@@ -117,13 +120,13 @@ impl MLSAG {
                     hash.update(
                         RistrettoPoint::multiscalar_mul(
                             &[responses.0[i][j], challenge_1],
-                            &[point::hash::<Hash>(rings.0[i][j]), images.0[j]],
+                            &[point_hash::<Hash>(rings.0[i][j]), images.0[j]],
                         )
                         .compress()
                         .as_bytes(),
                     );
                 }
-                challenge_1 = scalar::from_hash(hash);
+                challenge_1 = scalar_from_hash(hash);
             }
             Some(challenge_0 == challenge_1)
         }() {
@@ -139,7 +142,7 @@ impl MLSAG {
             .collect::<Vec<_>>();
         Images(
             (0..nc)
-                .map(|i| secrets[i].0 * point::hash::<Hash>(publics[i]))
+                .map(|i| secrets[i].0 * point_hash::<Hash>(publics[i]))
                 .collect(),
         )
     }

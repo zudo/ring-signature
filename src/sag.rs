@@ -1,4 +1,7 @@
-use crate::scalar;
+use crate::scalar_from_canonical;
+use crate::scalar_from_hash;
+use crate::scalar_random;
+use crate::scalar_zero;
 use crate::Response;
 use crate::Ring;
 use crate::Secret;
@@ -31,14 +34,14 @@ impl SAG {
         let hash = Hash::new().chain_update(data);
         let mut hashes = (0..ring_size).map(|_| hash.clone()).collect::<Vec<_>>();
         let mut current_index = (secret_index + 1) % ring_size;
-        let secret_scalar_1 = scalar::random(rng);
+        let secret_scalar_1 = scalar_random(rng);
         hashes[current_index].update(
             (secret_scalar_1 * RISTRETTO_BASEPOINT_POINT)
                 .compress()
                 .as_bytes(),
         );
-        let mut challenges = vec![scalar::zero(); ring_size];
-        challenges[current_index] = scalar::from_hash(hashes[current_index].clone());
+        let mut challenges = vec![scalar_zero(); ring_size];
+        challenges[current_index] = scalar_from_hash(hashes[current_index].clone());
         let mut response = Response::random(rng, ring_size);
         loop {
             let next_index = (current_index + 1) % ring_size;
@@ -50,7 +53,7 @@ impl SAG {
                 .compress()
                 .as_bytes(),
             );
-            challenges[next_index] = scalar::from_hash(hashes[next_index].clone());
+            challenges[next_index] = scalar_from_hash(hashes[next_index].clone());
             if (secret_index >= 1 && current_index == (secret_index - 1) % ring_size)
                 || (secret_index == 0 && current_index == ring_size - 1)
             {
@@ -68,7 +71,7 @@ impl SAG {
     pub fn verify<Hash: Digest<OutputSize = U64> + Clone>(&self, data: impl AsRef<[u8]>) -> bool {
         match || -> Option<bool> {
             let hash = Hash::new().chain_update(data);
-            let challenge_0 = scalar::from_canonical(self.challenge)?;
+            let challenge_0 = scalar_from_canonical(self.challenge)?;
             let mut challenge_1 = challenge_0;
             let response = Response::from_canonical(&self.response)?;
             let ring = Ring::decompress(&self.ring)?;
@@ -82,7 +85,7 @@ impl SAG {
                     .compress()
                     .as_bytes(),
                 );
-                challenge_1 = scalar::from_hash(hash);
+                challenge_1 = scalar_from_hash(hash);
             }
             Some(challenge_0 == challenge_1)
         }() {
