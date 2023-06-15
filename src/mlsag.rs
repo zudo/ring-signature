@@ -4,7 +4,6 @@ use crate::scalar_from_canonical;
 use crate::scalar_from_hash;
 use crate::scalar_random;
 use crate::scalar_zero;
-use crate::Responses;
 use crate::Rings;
 use crate::G;
 use curve25519_dalek::ristretto::RistrettoPoint;
@@ -37,7 +36,9 @@ impl MLSAG {
         let secret_index = rng.gen_range(0..nr);
         rings.0.insert(secret_index, k_points.clone());
         let a: Vec<Scalar> = (0..nc).map(|_| scalar_random(rng)).collect();
-        let mut responses = Responses::random(rng, nr, nc);
+        let mut responses = (0..nr)
+            .map(|_| (0..nc).map(|_| scalar_random(rng)).collect())
+            .collect::<Vec<Vec<_>>>();
         let mut challenges: Vec<Scalar> = (0..nr).map(|_| scalar_zero()).collect();
         let mut hash = Hash::new();
         hash.update(message);
@@ -57,7 +58,7 @@ impl MLSAG {
             for j in 0..nc {
                 hashes[(i + 1) % nr].update(
                     RistrettoPoint::multiscalar_mul(
-                        &[responses.0[i % nr][j], challenges[i % nr]],
+                        &[responses[i % nr][j], challenges[i % nr]],
                         &[G, rings.0[i % nr][j]],
                     )
                     .compress()
@@ -65,7 +66,7 @@ impl MLSAG {
                 );
                 hashes[(i + 1) % nr].update(
                     RistrettoPoint::multiscalar_mul(
-                        &[responses.0[i % nr][j], challenges[i % nr]],
+                        &[responses[i % nr][j], challenges[i % nr]],
                         &[point_hash::<Hash>(rings.0[i % nr][j]), images[j]],
                     )
                     .compress()
@@ -82,11 +83,19 @@ impl MLSAG {
             }
         }
         for j in 0..nc {
-            responses.0[secret_index][j] = a[j] - (challenges[secret_index] * secrets[j]);
+            responses[secret_index][j] = a[j] - (challenges[secret_index] * secrets[j]);
         }
         Some(MLSAG {
             challenge: challenges[0].to_bytes(),
-            responses: responses.to_bytes(),
+            responses: responses
+                .iter()
+                .map(|response| {
+                    response
+                        .iter()
+                        .map(|response| response.to_bytes())
+                        .collect()
+                })
+                .collect::<Vec<Vec<_>>>(),
             ring: rings.compress(),
             images: images
                 .iter()
@@ -102,7 +111,15 @@ impl MLSAG {
                 .iter()
                 .map(|bytes| point_from_slice(bytes))
                 .collect::<Option<Vec<_>>>()?;
-            let responses = Responses::from_canonical(&self.responses)?;
+            let responses = self
+                .responses
+                .iter()
+                .map(|vec| {
+                    vec.iter()
+                        .map(|&bytes| scalar_from_canonical(bytes))
+                        .collect()
+                })
+                .collect::<Option<Vec<Vec<_>>>>()?;
             let challenge_0 = scalar_from_canonical(self.challenge)?;
             let mut challenge_1 = challenge_0;
             let nr = self.ring.len();
@@ -113,7 +130,7 @@ impl MLSAG {
                 for j in 0..nc {
                     hash.update(
                         RistrettoPoint::multiscalar_mul(
-                            &[responses.0[i][j], challenge_1],
+                            &[responses[i][j], challenge_1],
                             &[G, rings.0[i][j]],
                         )
                         .compress()
@@ -121,7 +138,7 @@ impl MLSAG {
                     );
                     hash.update(
                         RistrettoPoint::multiscalar_mul(
-                            &[responses.0[i][j], challenge_1],
+                            &[responses[i][j], challenge_1],
                             &[point_hash::<Hash>(rings.0[i][j]), images[j]],
                         )
                         .compress()

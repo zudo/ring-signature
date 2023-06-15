@@ -5,7 +5,6 @@ use crate::scalar_from_canonical;
 use crate::scalar_from_hash;
 use crate::scalar_random;
 use crate::scalar_zero;
-use crate::Response;
 use crate::Rings;
 use crate::G;
 use curve25519_dalek::ristretto::RistrettoPoint;
@@ -65,13 +64,15 @@ impl CLSAG {
         hashes[current_index].update((secret_scalar * base_point).compress().as_bytes());
         let mut challenges = vec![scalar_zero(); ring_size];
         challenges[current_index] = scalar_from_hash(hashes[current_index].clone());
-        let mut response = Response::random(rng, ring_size);
+        let mut response = (0..ring_size)
+            .map(|_| scalar_random(rng))
+            .collect::<Vec<_>>();
         loop {
             let next_index = (current_index + 1) % ring_size;
             hashes[next_index].update(
                 RistrettoPoint::multiscalar_mul(
                     &[
-                        response.0[current_index % ring_size],
+                        response[current_index % ring_size],
                         challenges[current_index % ring_size],
                     ],
                     &[G, aggregate_public_keys[current_index % ring_size]],
@@ -82,7 +83,7 @@ impl CLSAG {
             hashes[next_index].update(
                 RistrettoPoint::multiscalar_mul(
                     &[
-                        response.0[current_index % ring_size],
+                        response[current_index % ring_size],
                         challenges[current_index % ring_size],
                     ],
                     &[
@@ -101,11 +102,13 @@ impl CLSAG {
             }
             current_index = next_index;
         }
-        response.0[secret_index] =
-            secret_scalar - (challenges[secret_index] * aggregate_private_key);
+        response[secret_index] = secret_scalar - (challenges[secret_index] * aggregate_private_key);
         Some(CLSAG {
             challenge: challenges[0].to_bytes(),
-            response: response.to_bytes(),
+            response: response
+                .iter()
+                .map(|response| response.to_bytes())
+                .collect(),
             rings: rings.compress(),
             images: images
                 .iter()
@@ -123,7 +126,11 @@ impl CLSAG {
                 .iter()
                 .map(|bytes| point_from_slice(bytes))
                 .collect::<Option<Vec<_>>>()?;
-            let response = Response::from_canonical(&self.response)?;
+            let response = self
+                .response
+                .iter()
+                .map(|&bytes| scalar_from_canonical(bytes))
+                .collect::<Option<Vec<_>>>()?;
             let challenge_0 = scalar_from_canonical(self.challenge)?;
             let mut challenge_1 = challenge_0;
             let prefixed_hashes_with_images =
@@ -143,7 +150,7 @@ impl CLSAG {
                 hash.update(&data);
                 hash.update(
                     RistrettoPoint::multiscalar_mul(
-                        &[response.0[i], challenge_1],
+                        &[response[i], challenge_1],
                         &[G, aggregate_public_keys[i]],
                     )
                     .compress()
@@ -151,7 +158,7 @@ impl CLSAG {
                 );
                 hash.update(
                     RistrettoPoint::multiscalar_mul(
-                        &[response.0[i], challenge_1],
+                        &[response[i], challenge_1],
                         &[point_hash::<Hash>(rings.0[i][0]), aggregate_image],
                     )
                     .compress()

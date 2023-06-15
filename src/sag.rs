@@ -2,7 +2,6 @@ use crate::scalar_from_canonical;
 use crate::scalar_from_hash;
 use crate::scalar_random;
 use crate::scalar_zero;
-use crate::Response;
 use crate::Ring;
 use crate::G;
 use curve25519_dalek::ristretto::RistrettoPoint;
@@ -37,12 +36,14 @@ impl SAG {
         hashes[current_index].update((secret_scalar_1 * G).compress().as_bytes());
         let mut challenges = vec![scalar_zero(); ring_size];
         challenges[current_index] = scalar_from_hash(hashes[current_index].clone());
-        let mut response = Response::random(rng, ring_size);
+        let mut response = (0..ring_size)
+            .map(|_| scalar_random(rng))
+            .collect::<Vec<_>>();
         loop {
             let next_index = (current_index + 1) % ring_size;
             hashes[next_index].update(
                 RistrettoPoint::multiscalar_mul(
-                    &[response.0[current_index], challenges[current_index]],
+                    &[response[current_index], challenges[current_index]],
                     &[G, ring.0[current_index]],
                 )
                 .compress()
@@ -56,10 +57,13 @@ impl SAG {
             }
             current_index = next_index;
         }
-        response.0[secret_index] = secret_scalar_1 - (challenges[secret_index] * secret);
+        response[secret_index] = secret_scalar_1 - (challenges[secret_index] * secret);
         Some(SAG {
             challenge: challenges[0].to_bytes(),
-            response: response.to_bytes(),
+            response: response
+                .iter()
+                .map(|response| response.to_bytes())
+                .collect(),
             ring: ring.compress(),
         })
     }
@@ -68,12 +72,16 @@ impl SAG {
             let hash = Hash::new().chain_update(data);
             let challenge_0 = scalar_from_canonical(self.challenge)?;
             let mut challenge_1 = challenge_0;
-            let response = Response::from_canonical(&self.response)?;
+            let response = self
+                .response
+                .iter()
+                .map(|&bytes| scalar_from_canonical(bytes))
+                .collect::<Option<Vec<_>>>()?;
             let ring = Ring::decompress(&self.ring)?;
             for i in 0..self.ring.len() {
                 let mut hash = hash.clone();
                 hash.update(
-                    RistrettoPoint::multiscalar_mul(&[response.0[i], challenge_1], &[G, ring.0[i]])
+                    RistrettoPoint::multiscalar_mul(&[response[i], challenge_1], &[G, ring.0[i]])
                         .compress()
                         .as_bytes(),
                 );

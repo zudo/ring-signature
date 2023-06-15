@@ -56,48 +56,6 @@ impl Rings {
         )
     }
 }
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Response(pub Vec<Scalar>);
-impl Response {
-    pub fn to_bytes(&self) -> Vec<[u8; 32]> {
-        self.0.iter().map(|x| x.to_bytes()).collect()
-    }
-    pub fn from_canonical(vec: &Vec<[u8; 32]>) -> Option<Response> {
-        Some(Response(
-            vec.iter()
-                .map(|&x| scalar_from_canonical(x))
-                .collect::<Option<Vec<_>>>()?,
-        ))
-    }
-    pub fn random(rng: &mut impl CryptoRngCore, x: usize) -> Response {
-        Response((0..x).map(|_| scalar_random(rng)).collect())
-    }
-}
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Responses(pub Vec<Vec<Scalar>>);
-impl Responses {
-    pub fn to_bytes(&self) -> Vec<Vec<[u8; 32]>> {
-        self.0
-            .iter()
-            .map(|x| x.iter().map(|y| y.to_bytes()).collect())
-            .collect()
-    }
-    pub fn from_canonical(vec_2d: &Vec<Vec<[u8; 32]>>) -> Option<Responses> {
-        Some(Responses(
-            vec_2d
-                .iter()
-                .map(|x| x.iter().map(|&y| scalar_from_canonical(y)).collect())
-                .collect::<Option<Vec<_>>>()?,
-        ))
-    }
-    pub fn random(rng: &mut impl CryptoRngCore, x: usize, y: usize) -> Responses {
-        Responses(
-            (0..x)
-                .map(|_| (0..y).map(|_| scalar_random(rng)).collect())
-                .collect(),
-        )
-    }
-}
 pub fn point_from_slice(bytes: &[u8; 32]) -> Option<RistrettoPoint> {
     CompressedRistretto::from_slice(bytes).unwrap().decompress()
 }
