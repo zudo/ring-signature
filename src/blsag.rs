@@ -1,9 +1,10 @@
+use crate::image;
+use crate::point_from_slice;
 use crate::point_hash;
 use crate::scalar_from_canonical;
 use crate::scalar_from_hash;
 use crate::scalar_random;
 use crate::scalar_zero;
-use crate::Image;
 use crate::Response;
 use crate::Ring;
 use crate::G;
@@ -30,7 +31,7 @@ impl BLSAG {
         mut ring: Ring,
         data: impl AsRef<[u8]>,
     ) -> Option<BLSAG> {
-        let image = Image::new::<Hash>(secret);
+        let image = image::<Hash>(secret);
         let secret_index = rng.gen_range(0..=ring.0.len());
         ring.0.insert(secret_index, secret * G);
         let ring_size = ring.0.len();
@@ -60,7 +61,7 @@ impl BLSAG {
             hashes[next_index].update(
                 RistrettoPoint::multiscalar_mul(
                     &[response.0[current_index], challenges[current_index]],
-                    &[point_hash::<Hash>(ring.0[current_index]), image.0],
+                    &[point_hash::<Hash>(ring.0[current_index]), image],
                 )
                 .compress()
                 .as_bytes(),
@@ -78,7 +79,7 @@ impl BLSAG {
             challenge: challenges[0].to_bytes(),
             response: response.to_bytes(),
             ring: ring.compress(),
-            image: image.compress(),
+            image: image.compress().to_bytes(),
         })
     }
     pub fn verify<Hash: Digest<OutputSize = U64> + Clone>(&self, data: impl AsRef<[u8]>) -> bool {
@@ -88,7 +89,7 @@ impl BLSAG {
             let mut challenge_1 = challenge_0;
             let response = Response::from_canonical(&self.response)?;
             let ring = Ring::decompress(&self.ring)?;
-            let image = Image::decompress(&self.image)?;
+            let image = point_from_slice(&self.image)?;
             for i in 0..ring.0.len() {
                 let mut hash = hash.clone();
                 hash.update(
@@ -99,7 +100,7 @@ impl BLSAG {
                 hash.update(
                     RistrettoPoint::multiscalar_mul(
                         &[response.0[i], challenge_1],
-                        &[point_hash::<Hash>(ring.0[i]), image.0],
+                        &[point_hash::<Hash>(ring.0[i]), image],
                     )
                     .compress()
                     .as_bytes(),

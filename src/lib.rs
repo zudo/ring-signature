@@ -98,41 +98,6 @@ impl Responses {
         )
     }
 }
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Image(pub RistrettoPoint);
-impl Image {
-    pub fn compress(&self) -> [u8; 32] {
-        self.0.compress().to_bytes()
-    }
-    pub fn decompress(bytes: &[u8; 32]) -> Option<Image> {
-        Some(Image(point_from_slice(bytes)?))
-    }
-    pub fn new<Hash: Digest<OutputSize = U64>>(secret: &Scalar) -> Image {
-        let a = secret * G;
-        let b = point_hash::<Hash>(a);
-        Image(secret * b)
-    }
-}
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Images(pub Vec<RistrettoPoint>);
-impl Images {
-    pub fn compress(&self) -> Vec<[u8; 32]> {
-        self.0.iter().map(|x| x.compress().to_bytes()).collect()
-    }
-    pub fn decompress(bytes: &Vec<[u8; 32]>) -> Option<Images> {
-        Some(Images(
-            bytes
-                .iter()
-                .map(|x| point_from_slice(x))
-                .collect::<Option<Vec<_>>>()?,
-        ))
-    }
-    pub fn new<Hash: Digest<OutputSize = U64>>(secrets: &[Scalar]) -> Images {
-        let a = secrets[0] * G;
-        let b = point_hash::<Hash>(a);
-        Images(secrets.iter().map(|secret| secret * b).collect())
-    }
-}
 pub fn point_from_slice(bytes: &[u8; 32]) -> Option<RistrettoPoint> {
     CompressedRistretto::from_slice(bytes).unwrap().decompress()
 }
@@ -162,4 +127,14 @@ pub fn scalar_zero() -> Scalar {
 }
 pub fn scalar_from_hash<Hash: Digest<OutputSize = U64>>(hash: Hash) -> Scalar {
     Scalar::from_bytes_mod_order_wide(&hash.finalize().into())
+}
+pub fn image<Hash: Digest<OutputSize = U64>>(secret: &Scalar) -> RistrettoPoint {
+    let a = secret * G;
+    let b = point_hash::<Hash>(a);
+    secret * b
+}
+pub fn images<Hash: Digest<OutputSize = U64>>(secrets: &[Scalar]) -> Vec<RistrettoPoint> {
+    let a = secrets[0] * G;
+    let b = point_hash::<Hash>(a);
+    secrets.iter().map(|secret| secret * b).collect()
 }

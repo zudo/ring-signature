@@ -1,9 +1,9 @@
+use crate::point_from_slice;
 use crate::point_hash;
 use crate::scalar_from_canonical;
 use crate::scalar_from_hash;
 use crate::scalar_random;
 use crate::scalar_zero;
-use crate::Images;
 use crate::Responses;
 use crate::Rings;
 use crate::G;
@@ -66,7 +66,7 @@ impl MLSAG {
                 hashes[(i + 1) % nr].update(
                     RistrettoPoint::multiscalar_mul(
                         &[responses.0[i % nr][j], challenges[i % nr]],
-                        &[point_hash::<Hash>(rings.0[i % nr][j]), images.0[j]],
+                        &[point_hash::<Hash>(rings.0[i % nr][j]), images[j]],
                     )
                     .compress()
                     .as_bytes(),
@@ -88,13 +88,20 @@ impl MLSAG {
             challenge: challenges[0].to_bytes(),
             responses: responses.to_bytes(),
             ring: rings.compress(),
-            images: images.compress(),
+            images: images
+                .iter()
+                .map(|image| image.compress().to_bytes())
+                .collect(),
         })
     }
     pub fn verify<Hash: Digest<OutputSize = U64> + Clone>(&self, data: impl AsRef<[u8]>) -> bool {
         match || -> Option<bool> {
             let rings = Rings::decompress(&self.ring)?;
-            let images = Images::decompress(&self.images)?;
+            let images = self
+                .images
+                .iter()
+                .map(|bytes| point_from_slice(bytes))
+                .collect::<Option<Vec<_>>>()?;
             let responses = Responses::from_canonical(&self.responses)?;
             let challenge_0 = scalar_from_canonical(self.challenge)?;
             let mut challenge_1 = challenge_0;
@@ -115,7 +122,7 @@ impl MLSAG {
                     hash.update(
                         RistrettoPoint::multiscalar_mul(
                             &[responses.0[i][j], challenge_1],
-                            &[point_hash::<Hash>(rings.0[i][j]), images.0[j]],
+                            &[point_hash::<Hash>(rings.0[i][j]), images[j]],
                         )
                         .compress()
                         .as_bytes(),
@@ -129,14 +136,12 @@ impl MLSAG {
             None => return false,
         }
     }
-    pub fn image<Hash: Digest<OutputSize = U64>>(secrets: &[Scalar]) -> Images {
+    pub fn image<Hash: Digest<OutputSize = U64>>(secrets: &[Scalar]) -> Vec<RistrettoPoint> {
         let nc = secrets.len();
         let publics = secrets.iter().map(|secret| secret * G).collect::<Vec<_>>();
-        Images(
-            (0..nc)
-                .map(|i| secrets[i] * point_hash::<Hash>(publics[i]))
-                .collect(),
-        )
+        (0..nc)
+            .map(|i| secrets[i] * point_hash::<Hash>(publics[i]))
+            .collect()
     }
     pub fn link(images: &[&[[u8; 32]]]) -> bool {
         if images.is_empty() || images[0].is_empty() {
