@@ -4,10 +4,10 @@ use crate::scalar_random;
 use crate::scalar_zero;
 use crate::Response;
 use crate::Ring;
-use crate::Secret;
 use crate::G;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::traits::MultiscalarMul;
+use curve25519_dalek::Scalar;
 use digest::typenum::U64;
 use digest::Digest;
 use rand::Rng;
@@ -23,12 +23,12 @@ pub struct SAG {
 impl SAG {
     pub fn sign<Hash: Digest<OutputSize = U64> + Clone>(
         rng: &mut impl CryptoRngCore,
-        secret: &Secret,
+        secret: &Scalar,
         mut ring: Ring,
         data: impl AsRef<[u8]>,
     ) -> Option<SAG> {
         let secret_index = rng.gen_range(0..=ring.0.len());
-        ring.0.insert(secret_index, secret.0 * G);
+        ring.0.insert(secret_index, secret * G);
         let ring_size = ring.0.len();
         let hash = Hash::new().chain_update(data);
         let mut hashes = (0..ring_size).map(|_| hash.clone()).collect::<Vec<_>>();
@@ -56,7 +56,7 @@ impl SAG {
             }
             current_index = next_index;
         }
-        response.0[secret_index] = secret_scalar_1 - (challenges[secret_index] * secret.0);
+        response.0[secret_index] = secret_scalar_1 - (challenges[secret_index] * secret);
         Some(SAG {
             challenge: challenges[0].to_bytes(),
             response: response.to_bytes(),
@@ -95,8 +95,8 @@ mod tests {
     const DATA: &[u8] = b"hello from zudo";
     const X: usize = 2;
     lazy_static! {
-        static ref SECRET_0: Secret = Secret::new(&mut OsRng {});
-        static ref SECRET_1: Secret = Secret::new(&mut OsRng {});
+        static ref SECRET_0: Scalar = scalar_random(&mut OsRng {});
+        static ref SECRET_1: Scalar = scalar_random(&mut OsRng {});
         static ref RING_0: Ring = Ring::random(&mut OsRng {}, X);
         static ref RING_1: Ring = Ring::random(&mut OsRng {}, X);
     }

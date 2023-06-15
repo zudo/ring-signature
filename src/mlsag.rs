@@ -6,7 +6,6 @@ use crate::scalar_zero;
 use crate::Images;
 use crate::Responses;
 use crate::Rings;
-use crate::Secret;
 use crate::G;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
@@ -27,13 +26,13 @@ pub struct MLSAG {
 impl MLSAG {
     pub fn sign<Hash: Digest<OutputSize = U64> + Clone>(
         rng: &mut impl CryptoRngCore,
-        secrets: &[Secret],
+        secrets: &[Scalar],
         mut rings: Rings,
         message: impl AsRef<[u8]>,
     ) -> Option<MLSAG> {
         let nr = rings.0.len() + 1;
         let nc = rings.0[0].len();
-        let k_points = secrets.iter().map(|x| x.0 * G).collect::<Vec<_>>();
+        let k_points = secrets.iter().map(|secret| secret * G).collect::<Vec<_>>();
         let images = MLSAG::image::<Hash>(secrets);
         let secret_index = rng.gen_range(0..nr);
         rings.0.insert(secret_index, k_points.clone());
@@ -83,7 +82,7 @@ impl MLSAG {
             }
         }
         for j in 0..nc {
-            responses.0[secret_index][j] = a[j] - (challenges[secret_index] * secrets[j].0);
+            responses.0[secret_index][j] = a[j] - (challenges[secret_index] * secrets[j]);
         }
         Some(MLSAG {
             challenge: challenges[0].to_bytes(),
@@ -130,12 +129,12 @@ impl MLSAG {
             None => return false,
         }
     }
-    pub fn image<Hash: Digest<OutputSize = U64>>(secrets: &[Secret]) -> Images {
+    pub fn image<Hash: Digest<OutputSize = U64>>(secrets: &[Scalar]) -> Images {
         let nc = secrets.len();
-        let publics = secrets.iter().map(|x| x.0 * G).collect::<Vec<_>>();
+        let publics = secrets.iter().map(|secret| secret * G).collect::<Vec<_>>();
         Images(
             (0..nc)
-                .map(|i| secrets[i].0 * point_hash::<Hash>(publics[i]))
+                .map(|i| secrets[i] * point_hash::<Hash>(publics[i]))
                 .collect(),
         )
     }
@@ -161,8 +160,8 @@ mod tests {
     const X: usize = 2;
     const Y: usize = 2;
     lazy_static! {
-        static ref SECRETS_0: Vec<Secret> = (0..Y).map(|_| Secret::new(&mut OsRng {})).collect();
-        static ref SECRETS_1: Vec<Secret> = (0..Y).map(|_| Secret::new(&mut OsRng {})).collect();
+        static ref SECRETS_0: Vec<Scalar> = (0..Y).map(|_| scalar_random(&mut OsRng {})).collect();
+        static ref SECRETS_1: Vec<Scalar> = (0..Y).map(|_| scalar_random(&mut OsRng {})).collect();
         static ref RINGS_0: Rings = Rings::random(&mut OsRng {}, X, Y);
         static ref RINGS_1: Rings = Rings::random(&mut OsRng {}, X, Y);
     }

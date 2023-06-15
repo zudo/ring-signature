@@ -6,7 +6,6 @@ use crate::scalar_zero;
 use crate::Images;
 use crate::Response;
 use crate::Rings;
-use crate::Secret;
 use crate::G;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
@@ -27,12 +26,12 @@ pub struct CLSAG {
 impl CLSAG {
     pub fn sign<Hash: Digest<OutputSize = U64> + Clone>(
         rng: &mut impl CryptoRngCore,
-        secrets: &[Secret],
+        secrets: &[Scalar],
         mut rings: Rings,
         data: impl AsRef<[u8]>,
     ) -> Option<CLSAG> {
         let images = Images::new::<Hash>(secrets);
-        let public_points = secrets.iter().map(|x| x.0 * G).collect::<Vec<_>>();
+        let public_points = secrets.iter().map(|secret| secret * G).collect::<Vec<_>>();
         let base_point = point_hash::<Hash>(public_points[0]);
         let secret_index = rng.gen_range(0..=rings.0.len());
         rings.0.insert(secret_index, public_points);
@@ -192,11 +191,11 @@ impl CLSAG {
     fn aggregate_private_key<Hash: Digest<OutputSize = U64> + Clone>(
         rings: &Rings,
         prefixed_hashes_with_images: &Vec<Hash>,
-        secrets: &[Secret],
+        secrets: &[Scalar],
     ) -> Scalar {
         let ring_layers = rings.0[0].len();
         (0..ring_layers)
-            .map(|i| scalar_from_hash(prefixed_hashes_with_images[i].clone()) * secrets[i].0)
+            .map(|i| scalar_from_hash(prefixed_hashes_with_images[i].clone()) * secrets[i])
             .sum()
     }
     fn aggregate_public_keys<Hash: Digest<OutputSize = U64> + Clone>(
@@ -238,8 +237,8 @@ mod tests {
     const X: usize = 2;
     const Y: usize = 2;
     lazy_static! {
-        static ref SECRETS_0: Vec<Secret> = (0..Y).map(|_| Secret::new(&mut OsRng {})).collect();
-        static ref SECRETS_1: Vec<Secret> = (0..Y).map(|_| Secret::new(&mut OsRng {})).collect();
+        static ref SECRETS_0: Vec<Scalar> = (0..Y).map(|_| scalar_random(&mut OsRng {})).collect();
+        static ref SECRETS_1: Vec<Scalar> = (0..Y).map(|_| scalar_random(&mut OsRng {})).collect();
         static ref RINGS_0: Rings = Rings::random(&mut OsRng {}, X, Y);
         static ref RINGS_1: Rings = Rings::random(&mut OsRng {}, X, Y);
     }

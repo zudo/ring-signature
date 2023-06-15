@@ -10,22 +10,6 @@ pub mod clsag;
 pub mod mlsag;
 pub mod sag;
 pub const G: RistrettoPoint = RISTRETTO_BASEPOINT_POINT;
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct Secret(pub Scalar);
-impl Secret {
-    pub fn to_bytes(&self) -> [u8; 32] {
-        self.0.to_bytes()
-    }
-    pub fn as_bytes(&self) -> &[u8; 32] {
-        self.0.as_bytes()
-    }
-    pub fn from_canonical(bytes: [u8; 32]) -> Option<Secret> {
-        Some(Secret(scalar_from_canonical(bytes)?))
-    }
-    pub fn new(rng: &mut impl CryptoRngCore) -> Secret {
-        Secret(scalar_random(rng))
-    }
-}
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Ring(pub Vec<RistrettoPoint>);
 impl Ring {
@@ -123,10 +107,10 @@ impl Image {
     pub fn decompress(bytes: &[u8; 32]) -> Option<Image> {
         Some(Image(point_from_slice(bytes)?))
     }
-    pub fn new<Hash: Digest<OutputSize = U64>>(secret: &Secret) -> Image {
-        let a = secret.0 * G;
+    pub fn new<Hash: Digest<OutputSize = U64>>(secret: &Scalar) -> Image {
+        let a = secret * G;
         let b = point_hash::<Hash>(a);
-        Image(secret.0 * b)
+        Image(secret * b)
     }
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -143,10 +127,10 @@ impl Images {
                 .collect::<Option<Vec<_>>>()?,
         ))
     }
-    pub fn new<Hash: Digest<OutputSize = U64>>(secrets: &[Secret]) -> Images {
-        let a = secrets[0].0 * G;
+    pub fn new<Hash: Digest<OutputSize = U64>>(secrets: &[Scalar]) -> Images {
+        let a = secrets[0] * G;
         let b = point_hash::<Hash>(a);
-        Images(secrets.iter().map(|x| x.0 * b).collect())
+        Images(secrets.iter().map(|secret| secret * b).collect())
     }
 }
 pub fn point_from_slice(bytes: &[u8; 32]) -> Option<RistrettoPoint> {
