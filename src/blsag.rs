@@ -87,7 +87,7 @@ impl BLSAG {
             let response = Response::from_canonical(&self.response)?;
             let ring = Ring::decompress(&self.ring)?;
             let image = Image::decompress(&self.image)?;
-            for i in 0..self.ring.len() {
+            for i in 0..ring.0.len() {
                 let mut hash = hash.clone();
                 hash.update(
                     RistrettoPoint::multiscalar_mul(
@@ -100,10 +100,7 @@ impl BLSAG {
                 hash.update(
                     RistrettoPoint::multiscalar_mul(
                         &[response.0[i], challenge_1],
-                        &[
-                            point::from_hash(Hash::new().chain_update(self.ring[i])),
-                            image.0,
-                        ],
+                        &[point::hash::<Hash>(ring.0[i]), image.0],
                     )
                     .compress()
                     .as_bytes(),

@@ -13,9 +13,11 @@ pub fn random() -> RistrettoPoint {
     rng.fill_bytes(&mut bytes);
     RistrettoPoint::from_uniform_bytes(&bytes)
 }
-pub fn from_hash<Hash: Digest<OutputSize = U64>>(hash: Hash) -> RistrettoPoint {
-    RistrettoPoint::from_uniform_bytes(&hash.finalize().into())
-}
 pub fn hash<Hash: Digest<OutputSize = U64>>(point: RistrettoPoint) -> RistrettoPoint {
-    from_hash(Hash::new().chain_update(point.compress().as_bytes()))
+    RistrettoPoint::from_uniform_bytes(
+        &Hash::new()
+            .chain_update(point.compress().as_bytes())
+            .finalize()
+            .into(),
+    )
 }
