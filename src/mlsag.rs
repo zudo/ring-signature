@@ -7,7 +7,7 @@ use crate::Images;
 use crate::Responses;
 use crate::Rings;
 use crate::Secret;
-use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
+use crate::G;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::MultiscalarMul;
@@ -33,10 +33,7 @@ impl MLSAG {
     ) -> Option<MLSAG> {
         let nr = rings.0.len() + 1;
         let nc = rings.0[0].len();
-        let k_points = secrets
-            .iter()
-            .map(|x| x.0 * RISTRETTO_BASEPOINT_POINT)
-            .collect::<Vec<_>>();
+        let k_points = secrets.iter().map(|x| x.0 * G).collect::<Vec<_>>();
         let images = MLSAG::image::<Hash>(secrets);
         let secret_index = rng.gen_range(0..nr);
         rings.0.insert(secret_index, k_points.clone());
@@ -47,8 +44,7 @@ impl MLSAG {
         hash.update(message);
         let mut hashes: Vec<Hash> = (0..nr).map(|_| hash.clone()).collect();
         for j in 0..nc {
-            hashes[(secret_index + 1) % nr]
-                .update((a[j] * RISTRETTO_BASEPOINT_POINT).compress().as_bytes());
+            hashes[(secret_index + 1) % nr].update((a[j] * G).compress().as_bytes());
             hashes[(secret_index + 1) % nr].update(
                 (a[j] * point_hash::<Hash>(k_points[j]))
                     .compress()
@@ -63,7 +59,7 @@ impl MLSAG {
                 hashes[(i + 1) % nr].update(
                     RistrettoPoint::multiscalar_mul(
                         &[responses.0[i % nr][j], challenges[i % nr]],
-                        &[RISTRETTO_BASEPOINT_POINT, rings.0[i % nr][j]],
+                        &[G, rings.0[i % nr][j]],
                     )
                     .compress()
                     .as_bytes(),
@@ -112,7 +108,7 @@ impl MLSAG {
                     hash.update(
                         RistrettoPoint::multiscalar_mul(
                             &[responses.0[i][j], challenge_1],
-                            &[RISTRETTO_BASEPOINT_POINT, rings.0[i][j]],
+                            &[G, rings.0[i][j]],
                         )
                         .compress()
                         .as_bytes(),
@@ -136,10 +132,7 @@ impl MLSAG {
     }
     pub fn image<Hash: Digest<OutputSize = U64>>(secrets: &[Secret]) -> Images {
         let nc = secrets.len();
-        let publics = secrets
-            .iter()
-            .map(|x| x.0 * RISTRETTO_BASEPOINT_POINT)
-            .collect::<Vec<_>>();
+        let publics = secrets.iter().map(|x| x.0 * G).collect::<Vec<_>>();
         Images(
             (0..nc)
                 .map(|i| secrets[i].0 * point_hash::<Hash>(publics[i]))

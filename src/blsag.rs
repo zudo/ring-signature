@@ -7,7 +7,7 @@ use crate::Image;
 use crate::Response;
 use crate::Ring;
 use crate::Secret;
-use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
+use crate::G;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::traits::MultiscalarMul;
 use digest::generic_array::typenum::U64;
@@ -32,14 +32,13 @@ impl BLSAG {
     ) -> Option<BLSAG> {
         let image = Image::new::<Hash>(secret);
         let secret_index = rng.gen_range(0..=ring.0.len());
-        ring.0
-            .insert(secret_index, secret.0 * RISTRETTO_BASEPOINT_POINT);
+        ring.0.insert(secret_index, secret.0 * G);
         let ring_size = ring.0.len();
         let hash = Hash::new().chain_update(data);
         let mut hashes = (0..ring_size).map(|_| hash.clone()).collect::<Vec<_>>();
         let mut current_index = (secret_index + 1) % ring_size;
         let r = scalar_random(rng);
-        hashes[current_index].update((r * RISTRETTO_BASEPOINT_POINT).compress().as_bytes());
+        hashes[current_index].update((r * G).compress().as_bytes());
         hashes[current_index].update(
             (r * point_hash::<Hash>(ring.0[secret_index]))
                 .compress()
@@ -53,7 +52,7 @@ impl BLSAG {
             hashes[next_index].update(
                 RistrettoPoint::multiscalar_mul(
                     &[response.0[current_index], challenges[current_index]],
-                    &[RISTRETTO_BASEPOINT_POINT, ring.0[current_index]],
+                    &[G, ring.0[current_index]],
                 )
                 .compress()
                 .as_bytes(),
@@ -93,12 +92,9 @@ impl BLSAG {
             for i in 0..ring.0.len() {
                 let mut hash = hash.clone();
                 hash.update(
-                    RistrettoPoint::multiscalar_mul(
-                        &[response.0[i], challenge_1],
-                        &[RISTRETTO_BASEPOINT_POINT, ring.0[i]],
-                    )
-                    .compress()
-                    .as_bytes(),
+                    RistrettoPoint::multiscalar_mul(&[response.0[i], challenge_1], &[G, ring.0[i]])
+                        .compress()
+                        .as_bytes(),
                 );
                 hash.update(
                     RistrettoPoint::multiscalar_mul(
