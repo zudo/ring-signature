@@ -12,7 +12,7 @@ pub mod sag;
 pub mod scalar;
 pub const G: RistrettoPoint = RISTRETTO_BASEPOINT_POINT;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct Secret(Scalar);
+pub struct Secret(pub Scalar);
 impl Secret {
     pub fn to_bytes(&self) -> [u8; 32] {
         self.0.to_bytes()
@@ -28,7 +28,7 @@ impl Secret {
     }
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Ring(Vec<RistrettoPoint>);
+pub struct Ring(pub Vec<RistrettoPoint>);
 impl Ring {
     pub fn compress(&self) -> Vec<[u8; 32]> {
         self.0.iter().map(|x| x.compress().to_bytes()).collect()
@@ -45,7 +45,7 @@ impl Ring {
     }
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Rings(Vec<Vec<RistrettoPoint>>);
+pub struct Rings(pub Vec<Vec<RistrettoPoint>>);
 impl Rings {
     pub fn compress(&self) -> Vec<Vec<[u8; 32]>> {
         self.0
@@ -74,7 +74,7 @@ impl Rings {
     }
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Response(Vec<Scalar>);
+pub struct Response(pub Vec<Scalar>);
 impl Response {
     pub fn to_bytes(&self) -> Vec<[u8; 32]> {
         self.0.iter().map(|x| x.to_bytes()).collect()
@@ -91,7 +91,7 @@ impl Response {
     }
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Responses(Vec<Vec<Scalar>>);
+pub struct Responses(pub Vec<Vec<Scalar>>);
 impl Responses {
     pub fn to_bytes(&self) -> Vec<Vec<[u8; 32]>> {
         self.0
@@ -116,7 +116,7 @@ impl Responses {
     }
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Image(RistrettoPoint);
+pub struct Image(pub RistrettoPoint);
 impl Image {
     pub fn compress(&self) -> [u8; 32] {
         self.0.compress().to_bytes()
@@ -131,7 +131,7 @@ impl Image {
     }
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Images(Vec<RistrettoPoint>);
+pub struct Images(pub Vec<RistrettoPoint>);
 impl Images {
     pub fn compress(&self) -> Vec<[u8; 32]> {
         self.0.iter().map(|x| x.compress().to_bytes()).collect()
