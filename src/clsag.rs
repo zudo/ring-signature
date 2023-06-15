@@ -31,7 +31,7 @@ impl CLSAG {
         data: impl AsRef<[u8]>,
     ) -> Option<CLSAG> {
         let images = images::<Hash>(secrets);
-        let public_points = secrets.iter().map(|secret| secret * G).collect::<Vec<_>>();
+        let public_points = secrets.iter().map(|x| x * G).collect::<Vec<_>>();
         let base_point = point_hash::<Hash>(public_points[0]);
         let secret_index = rng.gen_range(0..=rings.0.len());
         rings.0.insert(secret_index, public_points);
@@ -105,15 +105,9 @@ impl CLSAG {
         response[secret_index] = secret_scalar - (challenges[secret_index] * aggregate_private_key);
         Some(CLSAG {
             challenge: challenges[0].to_bytes(),
-            response: response
-                .iter()
-                .map(|response| response.to_bytes())
-                .collect(),
+            response: response.iter().map(|x| x.to_bytes()).collect(),
             rings: rings.compress(),
-            images: images
-                .iter()
-                .map(|image| image.compress().to_bytes())
-                .collect(),
+            images: images.iter().map(|x| x.compress().to_bytes()).collect(),
         })
     }
     pub fn verify<Hash: Digest<OutputSize = U64> + Clone>(&self, data: impl AsRef<[u8]>) -> bool {
@@ -124,7 +118,7 @@ impl CLSAG {
             let images = self
                 .images
                 .iter()
-                .map(|bytes| point_from_slice(bytes))
+                .map(|x| point_from_slice(x))
                 .collect::<Option<Vec<_>>>()?;
             let response = self
                 .response

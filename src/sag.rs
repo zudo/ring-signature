@@ -60,10 +60,7 @@ impl SAG {
         response[secret_index] = secret_scalar_1 - (challenges[secret_index] * secret);
         Some(SAG {
             challenge: challenges[0].to_bytes(),
-            response: response
-                .iter()
-                .map(|response| response.to_bytes())
-                .collect(),
+            response: response.iter().map(|x| x.to_bytes()).collect(),
             ring: ring.compress(),
         })
     }

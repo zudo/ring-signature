@@ -78,10 +78,7 @@ impl BLSAG {
         response[secret_index] = r - (challenges[secret_index] * secret);
         Some(BLSAG {
             challenge: challenges[0].to_bytes(),
-            response: response
-                .iter()
-                .map(|response| response.to_bytes())
-                .collect(),
+            response: response.iter().map(|x| x.to_bytes()).collect(),
             ring: ring.compress(),
             image: image.compress().to_bytes(),
         })
