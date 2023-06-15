@@ -5,8 +5,6 @@ use curve25519_dalek::Scalar;
 use digest::typenum::U64;
 use digest::Digest;
 use rand_core::CryptoRngCore;
-use rand_core::OsRng;
-use rand_core::RngCore;
 pub mod blsag;
 pub mod clsag;
 pub mod mlsag;
@@ -41,8 +39,8 @@ impl Ring {
                 .collect::<Option<Vec<_>>>()?,
         ))
     }
-    pub fn random(x: usize) -> Ring {
-        Ring((0..x).map(|_| point_random()).collect())
+    pub fn random(rng: &mut impl CryptoRngCore, x: usize) -> Ring {
+        Ring((0..x).map(|_| point_random(rng)).collect())
     }
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -66,10 +64,10 @@ impl Rings {
                 .collect::<Option<Vec<_>>>()?,
         ))
     }
-    pub fn random(x: usize, y: usize) -> Rings {
+    pub fn random(rng: &mut impl CryptoRngCore, x: usize, y: usize) -> Rings {
         Rings(
             (0..x)
-                .map(|_| (0..y).map(|_| point_random()).collect())
+                .map(|_| (0..y).map(|_| point_random(rng)).collect())
                 .collect(),
         )
     }
@@ -154,8 +152,7 @@ impl Images {
 pub fn point_from_slice(bytes: &[u8; 32]) -> Option<RistrettoPoint> {
     CompressedRistretto::from_slice(bytes).unwrap().decompress()
 }
-pub fn point_random() -> RistrettoPoint {
-    let mut rng = OsRng {};
+pub fn point_random(rng: &mut impl CryptoRngCore) -> RistrettoPoint {
     let mut bytes = [0u8; 64];
     rng.fill_bytes(&mut bytes);
     RistrettoPoint::from_uniform_bytes(&bytes)

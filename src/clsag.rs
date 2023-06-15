@@ -250,8 +250,8 @@ mod tests {
     lazy_static! {
         static ref SECRETS_0: Vec<Secret> = (0..Y).map(|_| Secret::new(&mut OsRng {})).collect();
         static ref SECRETS_1: Vec<Secret> = (0..Y).map(|_| Secret::new(&mut OsRng {})).collect();
-        static ref RINGS_0: Rings = Rings::random(X, Y);
-        static ref RINGS_1: Rings = Rings::random(X, Y);
+        static ref RINGS_0: Rings = Rings::random(&mut OsRng {}, X, Y);
+        static ref RINGS_1: Rings = Rings::random(&mut OsRng {}, X, Y);
     }
     #[test]
     fn sign_verify() {

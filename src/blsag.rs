@@ -135,8 +135,8 @@ mod tests {
     lazy_static! {
         static ref SECRET_0: Secret = Secret::new(&mut OsRng {});
         static ref SECRET_1: Secret = Secret::new(&mut OsRng {});
-        static ref RING_0: Ring = Ring::random(X);
-        static ref RING_1: Ring = Ring::random(X);
+        static ref RING_0: Ring = Ring::random(&mut OsRng {}, X);
+        static ref RING_1: Ring = Ring::random(&mut OsRng {}, X);
     }
     #[test]
     fn sign_verify() {
