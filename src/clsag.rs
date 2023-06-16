@@ -196,9 +196,8 @@ impl CLSAG {
         let ring_size = rings.len();
         let ring_layers = rings[0].len();
         (0..ring_layers)
-            .map(|i| {
+            .map(|_| {
                 let mut hash = Hash::new();
-                hash.update(format!("CLSAG_{}", i));
                 for j in 0..ring_size {
                     for k in 0..ring_layers {
                         hash.update(rings[j][k].compress().as_bytes());
