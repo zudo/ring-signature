@@ -47,5 +47,5 @@ pub fn image<Hash: Digest<OutputSize = U64>>(secret: &Scalar) -> RistrettoPoint 
 pub fn images<Hash: Digest<OutputSize = U64>>(secrets: &[Scalar]) -> Vec<RistrettoPoint> {
     let a = secrets[0] * RISTRETTO_BASEPOINT_POINT;
     let b = point_hash::<Hash>(a);
-    secrets.iter().map(|x| x * b).collect()
+    secrets.iter().map(|scalar| scalar * b).collect()
 }

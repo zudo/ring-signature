@@ -77,8 +77,11 @@ impl BLSAG {
         response[secret_index] = r - (challenges[secret_index] * secret);
         Some(BLSAG {
             challenge: challenges[0].to_bytes(),
-            response: response.iter().map(|x| x.to_bytes()).collect(),
-            ring: ring.iter().map(|x| x.compress().to_bytes()).collect(),
+            response: response.iter().map(|scalar| scalar.to_bytes()).collect(),
+            ring: ring
+                .iter()
+                .map(|point| point.compress().to_bytes())
+                .collect(),
             image: image.compress().to_bytes(),
         })
     }
@@ -95,7 +98,7 @@ impl BLSAG {
             let ring = self
                 .ring
                 .iter()
-                .map(|x| point_from_slice(x))
+                .map(|bytes| point_from_slice(bytes))
                 .collect::<Option<Vec<_>>>()?;
             let image = point_from_slice(&self.image)?;
             for i in 0..ring.len() {
@@ -128,7 +131,7 @@ impl BLSAG {
         if images.is_empty() {
             return false;
         }
-        images.iter().skip(1).all(|x| x == &images[0])
+        images.iter().skip(1).all(|bytes| bytes == &images[0])
     }
 }
 #[cfg(test)]

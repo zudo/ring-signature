@@ -64,8 +64,11 @@ impl SAG {
         response[secret_index] = secret_scalar_1 - (challenges[secret_index] * secret);
         Some(SAG {
             challenge: challenges[0].to_bytes(),
-            response: response.iter().map(|x| x.to_bytes()).collect(),
-            ring: ring.iter().map(|x| x.compress().to_bytes()).collect(),
+            response: response.iter().map(|scalar| scalar.to_bytes()).collect(),
+            ring: ring
+                .iter()
+                .map(|point| point.compress().to_bytes())
+                .collect(),
         })
     }
     pub fn verify<Hash: Digest<OutputSize = U64> + Clone>(&self, data: impl AsRef<[u8]>) -> bool {
@@ -81,7 +84,7 @@ impl SAG {
             let ring = self
                 .ring
                 .iter()
-                .map(|x| point_from_slice(x))
+                .map(|bytes| point_from_slice(bytes))
                 .collect::<Option<Vec<_>>>()?;
             for i in 0..self.ring.len() {
                 let mut hash = hash.clone();

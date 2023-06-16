@@ -32,7 +32,7 @@ impl MLSAG {
         let nc = rings[0].len();
         let k_points = secrets
             .iter()
-            .map(|x| x * RISTRETTO_BASEPOINT_POINT)
+            .map(|scalar| scalar * RISTRETTO_BASEPOINT_POINT)
             .collect::<Vec<_>>();
         let images = MLSAG::image::<Hash>(secrets);
         let secret_index = rng.gen_range(0..nr);
@@ -92,13 +92,20 @@ impl MLSAG {
             challenge: challenges[0].to_bytes(),
             responses: responses
                 .iter()
-                .map(|x| x.iter().map(|y| y.to_bytes()).collect())
+                .map(|vec| vec.iter().map(|scalar| scalar.to_bytes()).collect())
                 .collect::<Vec<Vec<_>>>(),
             rings: rings
                 .iter()
-                .map(|x| x.iter().map(|y| y.compress().to_bytes()).collect())
+                .map(|vec| {
+                    vec.iter()
+                        .map(|point| point.compress().to_bytes())
+                        .collect()
+                })
                 .collect::<Vec<Vec<_>>>(),
-            images: images.iter().map(|x| x.compress().to_bytes()).collect(),
+            images: images
+                .iter()
+                .map(|point| point.compress().to_bytes())
+                .collect(),
         })
     }
     pub fn verify<Hash: Digest<OutputSize = U64> + Clone>(&self, data: impl AsRef<[u8]>) -> bool {
@@ -106,17 +113,21 @@ impl MLSAG {
             let rings = self
                 .rings
                 .iter()
-                .map(|x| x.iter().map(|y| point_from_slice(y)).collect())
+                .map(|vec| vec.iter().map(|bytes| point_from_slice(bytes)).collect())
                 .collect::<Option<Vec<Vec<_>>>>()?;
             let images = self
                 .images
                 .iter()
-                .map(|x| point_from_slice(x))
+                .map(|bytes| point_from_slice(bytes))
                 .collect::<Option<Vec<_>>>()?;
             let responses = self
                 .responses
                 .iter()
-                .map(|x| x.iter().map(|&y| scalar_from_canonical(y)).collect())
+                .map(|vec| {
+                    vec.iter()
+                        .map(|&bytes| scalar_from_canonical(bytes))
+                        .collect()
+                })
                 .collect::<Option<Vec<Vec<_>>>>()?;
             let challenge_0 = scalar_from_canonical(self.challenge)?;
             let mut challenge_1 = challenge_0;
@@ -155,7 +166,7 @@ impl MLSAG {
         let nc = secrets.len();
         let publics = secrets
             .iter()
-            .map(|x| x * RISTRETTO_BASEPOINT_POINT)
+            .map(|scalar| scalar * RISTRETTO_BASEPOINT_POINT)
             .collect::<Vec<_>>();
         (0..nc)
             .map(|i| secrets[i] * point_hash::<Hash>(publics[i]))
@@ -168,7 +179,7 @@ impl MLSAG {
         images
             .iter()
             .skip(1)
-            .all(|x| !x.is_empty() && x[0] == images[0][0])
+            .all(|&slice| !slice.is_empty() && slice[0] == images[0][0])
     }
 }
 #[cfg(test)]

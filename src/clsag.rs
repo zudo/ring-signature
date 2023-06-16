@@ -32,13 +32,13 @@ impl CLSAG {
         let images = images::<Hash>(secrets);
         let public_points = secrets
             .iter()
-            .map(|x| x * RISTRETTO_BASEPOINT_POINT)
+            .map(|scalar| scalar * RISTRETTO_BASEPOINT_POINT)
             .collect::<Vec<_>>();
         let base_point = point_hash::<Hash>(public_points[0]);
         let secret_index = rng.gen_range(0..=rings.len());
         rings.insert(secret_index, public_points);
-        let ring_size = rings.len();
-        let ring_layers = rings[0].len();
+        let x = rings.len();
+        let y = rings[0].len();
         let prefixed_hashes_with_images =
             CLSAG::prefixed_hashes_with_images::<Hash>(&rings, &images);
         let aggregate_private_key =
@@ -47,11 +47,11 @@ impl CLSAG {
             CLSAG::aggregate_public_keys(&rings, &prefixed_hashes_with_images);
         let aggregate_image =
             CLSAG::aggregate_image::<Hash>(&rings, &prefixed_hashes_with_images, &images);
-        let mut hashes = (0..ring_size)
+        let mut hashes = (0..x)
             .map(|_| {
                 let mut hash = Hash::new();
-                for i in 0..ring_size {
-                    for j in 0..ring_layers {
+                for i in 0..x {
+                    for j in 0..y {
                         hash.update(rings[i][j].compress().as_bytes());
                     }
                 }
@@ -60,29 +60,24 @@ impl CLSAG {
             })
             .collect::<Vec<_>>();
         let secret_scalar = scalar_random(rng);
-        let mut current_index = (secret_index + 1) % ring_size;
+        let mut current_index = (secret_index + 1) % x;
         hashes[current_index].update(
             (secret_scalar * RISTRETTO_BASEPOINT_POINT)
                 .compress()
                 .as_bytes(),
         );
         hashes[current_index].update((secret_scalar * base_point).compress().as_bytes());
-        let mut challenges = vec![scalar_zero(); ring_size];
+        let mut challenges = vec![scalar_zero(); x];
         challenges[current_index] = scalar_from_hash(hashes[current_index].clone());
-        let mut response = (0..ring_size)
-            .map(|_| scalar_random(rng))
-            .collect::<Vec<_>>();
+        let mut response = (0..x).map(|_| scalar_random(rng)).collect::<Vec<_>>();
         loop {
-            let next_index = (current_index + 1) % ring_size;
+            let next_index = (current_index + 1) % x;
             hashes[next_index].update(
                 RistrettoPoint::multiscalar_mul(
-                    &[
-                        response[current_index % ring_size],
-                        challenges[current_index % ring_size],
-                    ],
+                    &[response[current_index % x], challenges[current_index % x]],
                     &[
                         RISTRETTO_BASEPOINT_POINT,
-                        aggregate_public_keys[current_index % ring_size],
+                        aggregate_public_keys[current_index % x],
                     ],
                 )
                 .compress()
@@ -90,12 +85,9 @@ impl CLSAG {
             );
             hashes[next_index].update(
                 RistrettoPoint::multiscalar_mul(
+                    &[response[current_index % x], challenges[current_index % x]],
                     &[
-                        response[current_index % ring_size],
-                        challenges[current_index % ring_size],
-                    ],
-                    &[
-                        point_hash::<Hash>(rings[current_index % ring_size][0]),
+                        point_hash::<Hash>(rings[current_index % x][0]),
                         aggregate_image,
                     ],
                 )
@@ -103,8 +95,8 @@ impl CLSAG {
                 .as_bytes(),
             );
             challenges[next_index] = scalar_from_hash(hashes[next_index].clone());
-            if (secret_index >= 1 && current_index % ring_size == (secret_index - 1) % ring_size)
-                || (secret_index == 0 && current_index % ring_size == ring_size - 1)
+            if (secret_index >= 1 && current_index % x == (secret_index - 1) % x)
+                || (secret_index == 0 && current_index % x == x - 1)
             {
                 break;
             }
@@ -113,27 +105,34 @@ impl CLSAG {
         response[secret_index] = secret_scalar - (challenges[secret_index] * aggregate_private_key);
         Some(CLSAG {
             challenge: challenges[0].to_bytes(),
-            response: response.iter().map(|x| x.to_bytes()).collect(),
+            response: response.iter().map(|scalar| scalar.to_bytes()).collect(),
             rings: rings
                 .iter()
-                .map(|x| x.iter().map(|y| y.compress().to_bytes()).collect())
+                .map(|vec| {
+                    vec.iter()
+                        .map(|point| point.compress().to_bytes())
+                        .collect()
+                })
                 .collect::<Vec<Vec<_>>>(),
-            images: images.iter().map(|x| x.compress().to_bytes()).collect(),
+            images: images
+                .iter()
+                .map(|point| point.compress().to_bytes())
+                .collect(),
         })
     }
     pub fn verify<Hash: Digest<OutputSize = U64> + Clone>(&self, data: impl AsRef<[u8]>) -> bool {
         match || -> Option<bool> {
-            let ring_size = self.rings.len();
-            let ring_layers = self.rings[0].len();
+            let x = self.rings.len();
+            let y = self.rings[0].len();
             let rings = self
                 .rings
                 .iter()
-                .map(|x| x.iter().map(|y| point_from_slice(y)).collect())
+                .map(|vec| vec.iter().map(|bytes| point_from_slice(bytes)).collect())
                 .collect::<Option<Vec<Vec<_>>>>()?;
             let images = self
                 .images
                 .iter()
-                .map(|x| point_from_slice(x))
+                .map(|bytes| point_from_slice(bytes))
                 .collect::<Option<Vec<_>>>()?;
             let response = self
                 .response
@@ -148,10 +147,10 @@ impl CLSAG {
                 CLSAG::aggregate_public_keys(&rings, &prefixed_hashes_with_images);
             let aggregate_image =
                 CLSAG::aggregate_image::<Hash>(&rings, &prefixed_hashes_with_images, &images);
-            for i in 0..ring_size {
+            for i in 0..x {
                 let mut hash: Hash = Hash::new();
-                for j in 0..ring_size {
-                    for k in 0..ring_layers {
+                for j in 0..x {
+                    for k in 0..y {
                         hash.update(rings[j][k].compress().as_bytes());
                     }
                 }
@@ -187,23 +186,23 @@ impl CLSAG {
         images
             .iter()
             .skip(1)
-            .all(|x| !x.is_empty() && x[0] == images[0][0])
+            .all(|&slice| !slice.is_empty() && slice[0] == images[0][0])
     }
     fn prefixed_hashes_with_images<Hash: Digest<OutputSize = U64>>(
         rings: &Vec<Vec<RistrettoPoint>>,
         images: &Vec<RistrettoPoint>,
     ) -> Vec<Hash> {
-        let ring_size = rings.len();
-        let ring_layers = rings[0].len();
-        (0..ring_layers)
+        let x = rings.len();
+        let y = rings[0].len();
+        (0..y)
             .map(|_| {
                 let mut hash = Hash::new();
-                for j in 0..ring_size {
-                    for k in 0..ring_layers {
+                for j in 0..x {
+                    for k in 0..y {
                         hash.update(rings[j][k].compress().as_bytes());
                     }
                 }
-                for j in 0..ring_layers {
+                for j in 0..y {
                     hash.update(images[j].compress().as_bytes());
                 }
                 hash
@@ -215,8 +214,8 @@ impl CLSAG {
         prefixed_hashes_with_images: &Vec<Hash>,
         secrets: &[Scalar],
     ) -> Scalar {
-        let ring_layers = rings[0].len();
-        (0..ring_layers)
+        let y = rings[0].len();
+        (0..y)
             .map(|i| scalar_from_hash(prefixed_hashes_with_images[i].clone()) * secrets[i])
             .sum()
     }
@@ -224,11 +223,11 @@ impl CLSAG {
         rings: &Vec<Vec<RistrettoPoint>>,
         prefixed_hashes_with_images: &Vec<Hash>,
     ) -> Vec<RistrettoPoint> {
-        let ring_size = rings.len();
-        let ring_layers = rings[0].len();
-        (0..ring_size)
+        let x = rings.len();
+        let y = rings[0].len();
+        (0..x)
             .map(|i| {
-                (0..ring_layers)
+                (0..y)
                     .map(|j| scalar_from_hash(prefixed_hashes_with_images[j].clone()) * rings[i][j])
                     .sum()
             })
@@ -239,8 +238,8 @@ impl CLSAG {
         prefixed_hashes_with_images: &Vec<Hash>,
         images: &Vec<RistrettoPoint>,
     ) -> RistrettoPoint {
-        let ring_layers = rings[0].len();
-        (0..ring_layers)
+        let y = rings[0].len();
+        (0..y)
             .map(|i| scalar_from_hash(prefixed_hashes_with_images[i].clone()) * images[i])
             .sum()
     }
