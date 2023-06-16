@@ -18,7 +18,7 @@ use serde::Serialize;
 pub struct MLSAG {
     pub challenge: [u8; 32],
     pub responses: Vec<Vec<[u8; 32]>>,
-    pub ring: Vec<Vec<[u8; 32]>>,
+    pub rings: Vec<Vec<[u8; 32]>>,
     pub images: Vec<[u8; 32]>,
 }
 impl MLSAG {
@@ -94,7 +94,7 @@ impl MLSAG {
                 .iter()
                 .map(|x| x.iter().map(|y| y.to_bytes()).collect())
                 .collect::<Vec<Vec<_>>>(),
-            ring: rings
+            rings: rings
                 .iter()
                 .map(|x| x.iter().map(|y| y.compress().to_bytes()).collect())
                 .collect::<Vec<Vec<_>>>(),
@@ -104,7 +104,7 @@ impl MLSAG {
     pub fn verify<Hash: Digest<OutputSize = U64> + Clone>(&self, data: impl AsRef<[u8]>) -> bool {
         match || -> Option<bool> {
             let rings = self
-                .ring
+                .rings
                 .iter()
                 .map(|x| x.iter().map(|y| point_from_slice(y)).collect())
                 .collect::<Option<Vec<Vec<_>>>>()?;
@@ -120,8 +120,8 @@ impl MLSAG {
                 .collect::<Option<Vec<Vec<_>>>>()?;
             let challenge_0 = scalar_from_canonical(self.challenge)?;
             let mut challenge_1 = challenge_0;
-            let nr = self.ring.len();
-            let nc = self.ring[0].len();
+            let nr = self.rings.len();
+            let nc = self.rings[0].len();
             for i in 0..nr {
                 let mut hash = Hash::new();
                 hash.update(&data);
