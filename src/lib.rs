@@ -10,52 +10,6 @@ pub mod clsag;
 pub mod mlsag;
 pub mod sag;
 pub const G: RistrettoPoint = RISTRETTO_BASEPOINT_POINT;
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Ring(pub Vec<RistrettoPoint>);
-impl Ring {
-    pub fn compress(&self) -> Vec<[u8; 32]> {
-        self.0.iter().map(|x| x.compress().to_bytes()).collect()
-    }
-    pub fn decompress(vec: &Vec<[u8; 32]>) -> Option<Ring> {
-        Some(Ring(
-            vec.iter()
-                .map(|x| point_from_slice(x))
-                .collect::<Option<Vec<_>>>()?,
-        ))
-    }
-    pub fn random(rng: &mut impl CryptoRngCore, x: usize) -> Ring {
-        Ring((0..x).map(|_| point_random(rng)).collect())
-    }
-}
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Rings(pub Vec<Vec<RistrettoPoint>>);
-impl Rings {
-    pub fn compress(&self) -> Vec<Vec<[u8; 32]>> {
-        self.0
-            .iter()
-            .map(|x| x.iter().map(|y| y.compress().to_bytes()).collect())
-            .collect()
-    }
-    pub fn decompress(vec_2d: &Vec<Vec<[u8; 32]>>) -> Option<Rings> {
-        Some(Rings(
-            vec_2d
-                .iter()
-                .map(|x| {
-                    x.iter()
-                        .map(|y| point_from_slice(y))
-                        .collect::<Option<Vec<_>>>()
-                })
-                .collect::<Option<Vec<_>>>()?,
-        ))
-    }
-    pub fn random(rng: &mut impl CryptoRngCore, x: usize, y: usize) -> Rings {
-        Rings(
-            (0..x)
-                .map(|_| (0..y).map(|_| point_random(rng)).collect())
-                .collect(),
-        )
-    }
-}
 pub fn point_from_slice(bytes: &[u8; 32]) -> Option<RistrettoPoint> {
     CompressedRistretto::from_slice(bytes).unwrap().decompress()
 }

@@ -5,7 +5,6 @@ use crate::scalar_from_canonical;
 use crate::scalar_from_hash;
 use crate::scalar_random;
 use crate::scalar_zero;
-use crate::Ring;
 use crate::G;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::traits::MultiscalarMul;
@@ -27,20 +26,20 @@ impl BLSAG {
     pub fn sign<Hash: Digest<OutputSize = U64> + Clone>(
         rng: &mut impl CryptoRngCore,
         secret: &Scalar,
-        mut ring: Ring,
+        mut ring: Vec<RistrettoPoint>,
         data: impl AsRef<[u8]>,
     ) -> Option<BLSAG> {
         let image = image::<Hash>(secret);
-        let secret_index = rng.gen_range(0..=ring.0.len());
-        ring.0.insert(secret_index, secret * G);
-        let ring_size = ring.0.len();
+        let secret_index = rng.gen_range(0..=ring.len());
+        ring.insert(secret_index, secret * G);
+        let ring_size = ring.len();
         let hash = Hash::new().chain_update(data);
         let mut hashes = (0..ring_size).map(|_| hash.clone()).collect::<Vec<_>>();
         let mut current_index = (secret_index + 1) % ring_size;
         let r = scalar_random(rng);
         hashes[current_index].update((r * G).compress().as_bytes());
         hashes[current_index].update(
-            (r * point_hash::<Hash>(ring.0[secret_index]))
+            (r * point_hash::<Hash>(ring[secret_index]))
                 .compress()
                 .as_bytes(),
         );
@@ -54,7 +53,7 @@ impl BLSAG {
             hashes[next_index].update(
                 RistrettoPoint::multiscalar_mul(
                     &[response[current_index], challenges[current_index]],
-                    &[G, ring.0[current_index]],
+                    &[G, ring[current_index]],
                 )
                 .compress()
                 .as_bytes(),
@@ -62,7 +61,7 @@ impl BLSAG {
             hashes[next_index].update(
                 RistrettoPoint::multiscalar_mul(
                     &[response[current_index], challenges[current_index]],
-                    &[point_hash::<Hash>(ring.0[current_index]), image],
+                    &[point_hash::<Hash>(ring[current_index]), image],
                 )
                 .compress()
                 .as_bytes(),
@@ -79,7 +78,7 @@ impl BLSAG {
         Some(BLSAG {
             challenge: challenges[0].to_bytes(),
             response: response.iter().map(|x| x.to_bytes()).collect(),
-            ring: ring.compress(),
+            ring: ring.iter().map(|x| x.compress().to_bytes()).collect(),
             image: image.compress().to_bytes(),
         })
     }
@@ -93,19 +92,23 @@ impl BLSAG {
                 .iter()
                 .map(|&bytes| scalar_from_canonical(bytes))
                 .collect::<Option<Vec<_>>>()?;
-            let ring = Ring::decompress(&self.ring)?;
+            let ring = self
+                .ring
+                .iter()
+                .map(|x| point_from_slice(x))
+                .collect::<Option<Vec<_>>>()?;
             let image = point_from_slice(&self.image)?;
-            for i in 0..ring.0.len() {
+            for i in 0..ring.len() {
                 let mut hash = hash.clone();
                 hash.update(
-                    RistrettoPoint::multiscalar_mul(&[response[i], challenge_1], &[G, ring.0[i]])
+                    RistrettoPoint::multiscalar_mul(&[response[i], challenge_1], &[G, ring[i]])
                         .compress()
                         .as_bytes(),
                 );
                 hash.update(
                     RistrettoPoint::multiscalar_mul(
                         &[response[i], challenge_1],
-                        &[point_hash::<Hash>(ring.0[i]), image],
+                        &[point_hash::<Hash>(ring[i]), image],
                     )
                     .compress()
                     .as_bytes(),
@@ -128,6 +131,7 @@ impl BLSAG {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::point_random;
     use lazy_static::lazy_static;
     use rand_core::OsRng;
     use sha2::Sha512;
@@ -137,8 +141,10 @@ mod tests {
     lazy_static! {
         static ref SECRET_0: Scalar = scalar_random(&mut OsRng {});
         static ref SECRET_1: Scalar = scalar_random(&mut OsRng {});
-        static ref RING_0: Ring = Ring::random(&mut OsRng {}, X);
-        static ref RING_1: Ring = Ring::random(&mut OsRng {}, X);
+        static ref RING_0: Vec<RistrettoPoint> =
+            (0..X).map(|_| point_random(&mut OsRng {})).collect();
+        static ref RING_1: Vec<RistrettoPoint> =
+            (0..X).map(|_| point_random(&mut OsRng {})).collect();
     }
     #[test]
     fn sign_verify() {

@@ -4,7 +4,6 @@ use crate::scalar_from_canonical;
 use crate::scalar_from_hash;
 use crate::scalar_random;
 use crate::scalar_zero;
-use crate::Rings;
 use crate::G;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
@@ -26,15 +25,15 @@ impl MLSAG {
     pub fn sign<Hash: Digest<OutputSize = U64> + Clone>(
         rng: &mut impl CryptoRngCore,
         secrets: &[Scalar],
-        mut rings: Rings,
+        mut rings: Vec<Vec<RistrettoPoint>>,
         message: impl AsRef<[u8]>,
     ) -> Option<MLSAG> {
-        let nr = rings.0.len() + 1;
-        let nc = rings.0[0].len();
+        let nr = rings.len() + 1;
+        let nc = rings[0].len();
         let k_points = secrets.iter().map(|x| x * G).collect::<Vec<_>>();
         let images = MLSAG::image::<Hash>(secrets);
         let secret_index = rng.gen_range(0..nr);
-        rings.0.insert(secret_index, k_points.clone());
+        rings.insert(secret_index, k_points.clone());
         let a: Vec<Scalar> = (0..nc).map(|_| scalar_random(rng)).collect();
         let mut responses = (0..nr)
             .map(|_| (0..nc).map(|_| scalar_random(rng)).collect())
@@ -59,7 +58,7 @@ impl MLSAG {
                 hashes[(i + 1) % nr].update(
                     RistrettoPoint::multiscalar_mul(
                         &[responses[i % nr][j], challenges[i % nr]],
-                        &[G, rings.0[i % nr][j]],
+                        &[G, rings[i % nr][j]],
                     )
                     .compress()
                     .as_bytes(),
@@ -67,7 +66,7 @@ impl MLSAG {
                 hashes[(i + 1) % nr].update(
                     RistrettoPoint::multiscalar_mul(
                         &[responses[i % nr][j], challenges[i % nr]],
-                        &[point_hash::<Hash>(rings.0[i % nr][j]), images[j]],
+                        &[point_hash::<Hash>(rings[i % nr][j]), images[j]],
                     )
                     .compress()
                     .as_bytes(),
@@ -91,13 +90,20 @@ impl MLSAG {
                 .iter()
                 .map(|x| x.iter().map(|y| y.to_bytes()).collect())
                 .collect::<Vec<Vec<_>>>(),
-            ring: rings.compress(),
+            ring: rings
+                .iter()
+                .map(|x| x.iter().map(|y| y.compress().to_bytes()).collect())
+                .collect::<Vec<Vec<_>>>(),
             images: images.iter().map(|x| x.compress().to_bytes()).collect(),
         })
     }
     pub fn verify<Hash: Digest<OutputSize = U64> + Clone>(&self, data: impl AsRef<[u8]>) -> bool {
         match || -> Option<bool> {
-            let rings = Rings::decompress(&self.ring)?;
+            let rings = self
+                .ring
+                .iter()
+                .map(|x| x.iter().map(|y| point_from_slice(y)).collect())
+                .collect::<Option<Vec<Vec<_>>>>()?;
             let images = self
                 .images
                 .iter()
@@ -119,7 +125,7 @@ impl MLSAG {
                     hash.update(
                         RistrettoPoint::multiscalar_mul(
                             &[responses[i][j], challenge_1],
-                            &[G, rings.0[i][j]],
+                            &[G, rings[i][j]],
                         )
                         .compress()
                         .as_bytes(),
@@ -127,7 +133,7 @@ impl MLSAG {
                     hash.update(
                         RistrettoPoint::multiscalar_mul(
                             &[responses[i][j], challenge_1],
-                            &[point_hash::<Hash>(rings.0[i][j]), images[j]],
+                            &[point_hash::<Hash>(rings[i][j]), images[j]],
                         )
                         .compress()
                         .as_bytes(),
@@ -161,7 +167,7 @@ impl MLSAG {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Rings;
+    use crate::point_random;
     use lazy_static::lazy_static;
     use rand_core::OsRng;
     use sha2::Sha512;
@@ -172,8 +178,12 @@ mod tests {
     lazy_static! {
         static ref SECRETS_0: Vec<Scalar> = (0..Y).map(|_| scalar_random(&mut OsRng {})).collect();
         static ref SECRETS_1: Vec<Scalar> = (0..Y).map(|_| scalar_random(&mut OsRng {})).collect();
-        static ref RINGS_0: Rings = Rings::random(&mut OsRng {}, X, Y);
-        static ref RINGS_1: Rings = Rings::random(&mut OsRng {}, X, Y);
+        static ref RINGS_0: Vec<Vec<RistrettoPoint>> = (0..X)
+            .map(|_| (0..Y).map(|_| point_random(&mut OsRng {})).collect())
+            .collect();
+        static ref RINGS_1: Vec<Vec<RistrettoPoint>> = (0..X)
+            .map(|_| (0..Y).map(|_| point_random(&mut OsRng {})).collect())
+            .collect();
     }
     #[test]
     fn sign_verify() {
