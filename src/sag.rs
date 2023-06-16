@@ -28,23 +28,21 @@ impl SAG {
     ) -> Option<SAG> {
         let secret_index = rng.gen_range(0..=ring.len());
         ring.insert(secret_index, secret * RISTRETTO_BASEPOINT_POINT);
-        let ring_size = ring.len();
+        let x = ring.len();
         let hash = Hash::new().chain_update(data);
-        let mut hashes = (0..ring_size).map(|_| hash.clone()).collect::<Vec<_>>();
-        let mut current_index = (secret_index + 1) % ring_size;
+        let mut hashes = (0..x).map(|_| hash.clone()).collect::<Vec<_>>();
+        let mut current_index = (secret_index + 1) % x;
         let secret_scalar_1 = scalar_random(rng);
         hashes[current_index].update(
             (secret_scalar_1 * RISTRETTO_BASEPOINT_POINT)
                 .compress()
                 .as_bytes(),
         );
-        let mut challenges = vec![scalar_zero(); ring_size];
+        let mut challenges = vec![scalar_zero(); x];
         challenges[current_index] = scalar_from_hash(hashes[current_index].clone());
-        let mut response = (0..ring_size)
-            .map(|_| scalar_random(rng))
-            .collect::<Vec<_>>();
+        let mut response = (0..x).map(|_| scalar_random(rng)).collect::<Vec<_>>();
         loop {
-            let next_index = (current_index + 1) % ring_size;
+            let next_index = (current_index + 1) % x;
             hashes[next_index].update(
                 RistrettoPoint::multiscalar_mul(
                     &[response[current_index], challenges[current_index]],
@@ -54,8 +52,8 @@ impl SAG {
                 .as_bytes(),
             );
             challenges[next_index] = scalar_from_hash(hashes[next_index].clone());
-            if (secret_index >= 1 && current_index == (secret_index - 1) % ring_size)
-                || (secret_index == 0 && current_index == ring_size - 1)
+            if (secret_index >= 1 && current_index == (secret_index - 1) % x)
+                || (secret_index == 0 && current_index == x - 1)
             {
                 break;
             }
