@@ -3,7 +3,7 @@ use crate::scalar_from_canonical;
 use crate::scalar_from_hash;
 use crate::scalar_random;
 use crate::scalar_zero;
-use crate::G;
+use crate::RISTRETTO_BASEPOINT_POINT;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::traits::MultiscalarMul;
 use curve25519_dalek::Scalar;
@@ -27,13 +27,17 @@ impl SAG {
         data: impl AsRef<[u8]>,
     ) -> Option<SAG> {
         let secret_index = rng.gen_range(0..=ring.len());
-        ring.insert(secret_index, secret * G);
+        ring.insert(secret_index, secret * RISTRETTO_BASEPOINT_POINT);
         let ring_size = ring.len();
         let hash = Hash::new().chain_update(data);
         let mut hashes = (0..ring_size).map(|_| hash.clone()).collect::<Vec<_>>();
         let mut current_index = (secret_index + 1) % ring_size;
         let secret_scalar_1 = scalar_random(rng);
-        hashes[current_index].update((secret_scalar_1 * G).compress().as_bytes());
+        hashes[current_index].update(
+            (secret_scalar_1 * RISTRETTO_BASEPOINT_POINT)
+                .compress()
+                .as_bytes(),
+        );
         let mut challenges = vec![scalar_zero(); ring_size];
         challenges[current_index] = scalar_from_hash(hashes[current_index].clone());
         let mut response = (0..ring_size)
@@ -44,7 +48,7 @@ impl SAG {
             hashes[next_index].update(
                 RistrettoPoint::multiscalar_mul(
                     &[response[current_index], challenges[current_index]],
-                    &[G, ring[current_index]],
+                    &[RISTRETTO_BASEPOINT_POINT, ring[current_index]],
                 )
                 .compress()
                 .as_bytes(),
@@ -82,9 +86,12 @@ impl SAG {
             for i in 0..self.ring.len() {
                 let mut hash = hash.clone();
                 hash.update(
-                    RistrettoPoint::multiscalar_mul(&[response[i], challenge_1], &[G, ring[i]])
-                        .compress()
-                        .as_bytes(),
+                    RistrettoPoint::multiscalar_mul(
+                        &[response[i], challenge_1],
+                        &[RISTRETTO_BASEPOINT_POINT, ring[i]],
+                    )
+                    .compress()
+                    .as_bytes(),
                 );
                 challenge_1 = scalar_from_hash(hash);
             }

@@ -5,7 +5,7 @@ use crate::scalar_from_canonical;
 use crate::scalar_from_hash;
 use crate::scalar_random;
 use crate::scalar_zero;
-use crate::G;
+use crate::RISTRETTO_BASEPOINT_POINT;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::traits::MultiscalarMul;
 use curve25519_dalek::Scalar;
@@ -31,13 +31,13 @@ impl BLSAG {
     ) -> Option<BLSAG> {
         let image = image::<Hash>(secret);
         let secret_index = rng.gen_range(0..=ring.len());
-        ring.insert(secret_index, secret * G);
+        ring.insert(secret_index, secret * RISTRETTO_BASEPOINT_POINT);
         let ring_size = ring.len();
         let hash = Hash::new().chain_update(data);
         let mut hashes = (0..ring_size).map(|_| hash.clone()).collect::<Vec<_>>();
         let mut current_index = (secret_index + 1) % ring_size;
         let r = scalar_random(rng);
-        hashes[current_index].update((r * G).compress().as_bytes());
+        hashes[current_index].update((r * RISTRETTO_BASEPOINT_POINT).compress().as_bytes());
         hashes[current_index].update(
             (r * point_hash::<Hash>(ring[secret_index]))
                 .compress()
@@ -53,7 +53,7 @@ impl BLSAG {
             hashes[next_index].update(
                 RistrettoPoint::multiscalar_mul(
                     &[response[current_index], challenges[current_index]],
-                    &[G, ring[current_index]],
+                    &[RISTRETTO_BASEPOINT_POINT, ring[current_index]],
                 )
                 .compress()
                 .as_bytes(),
@@ -101,9 +101,12 @@ impl BLSAG {
             for i in 0..ring.len() {
                 let mut hash = hash.clone();
                 hash.update(
-                    RistrettoPoint::multiscalar_mul(&[response[i], challenge_1], &[G, ring[i]])
-                        .compress()
-                        .as_bytes(),
+                    RistrettoPoint::multiscalar_mul(
+                        &[response[i], challenge_1],
+                        &[RISTRETTO_BASEPOINT_POINT, ring[i]],
+                    )
+                    .compress()
+                    .as_bytes(),
                 );
                 hash.update(
                     RistrettoPoint::multiscalar_mul(

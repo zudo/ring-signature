@@ -2,14 +2,13 @@ pub mod blsag;
 pub mod clsag;
 pub mod mlsag;
 pub mod sag;
-use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
-use curve25519_dalek::ristretto::CompressedRistretto;
+pub use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
+pub use curve25519_dalek::ristretto::CompressedRistretto;
 pub use curve25519_dalek::RistrettoPoint;
 pub use curve25519_dalek::Scalar;
-use digest::typenum::U64;
-use digest::Digest;
-use rand_core::CryptoRngCore;
-pub const G: RistrettoPoint = RISTRETTO_BASEPOINT_POINT;
+pub use digest::typenum::U64;
+pub use digest::Digest;
+pub use rand_core::CryptoRngCore;
 pub fn point_from_slice(bytes: &[u8; 32]) -> Option<RistrettoPoint> {
     CompressedRistretto::from_slice(bytes).unwrap().decompress()
 }
@@ -41,12 +40,12 @@ pub fn scalar_from_hash<Hash: Digest<OutputSize = U64>>(hash: Hash) -> Scalar {
     Scalar::from_bytes_mod_order_wide(&hash.finalize().into())
 }
 pub fn image<Hash: Digest<OutputSize = U64>>(secret: &Scalar) -> RistrettoPoint {
-    let a = secret * G;
+    let a = secret * RISTRETTO_BASEPOINT_POINT;
     let b = point_hash::<Hash>(a);
     secret * b
 }
 pub fn images<Hash: Digest<OutputSize = U64>>(secrets: &[Scalar]) -> Vec<RistrettoPoint> {
-    let a = secrets[0] * G;
+    let a = secrets[0] * RISTRETTO_BASEPOINT_POINT;
     let b = point_hash::<Hash>(a);
     secrets.iter().map(|x| x * b).collect()
 }

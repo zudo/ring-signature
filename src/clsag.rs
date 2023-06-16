@@ -5,7 +5,7 @@ use crate::scalar_from_canonical;
 use crate::scalar_from_hash;
 use crate::scalar_random;
 use crate::scalar_zero;
-use crate::G;
+use crate::RISTRETTO_BASEPOINT_POINT;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::MultiscalarMul;
@@ -30,7 +30,10 @@ impl CLSAG {
         data: impl AsRef<[u8]>,
     ) -> Option<CLSAG> {
         let images = images::<Hash>(secrets);
-        let public_points = secrets.iter().map(|x| x * G).collect::<Vec<_>>();
+        let public_points = secrets
+            .iter()
+            .map(|x| x * RISTRETTO_BASEPOINT_POINT)
+            .collect::<Vec<_>>();
         let base_point = point_hash::<Hash>(public_points[0]);
         let secret_index = rng.gen_range(0..=rings.len());
         rings.insert(secret_index, public_points);
@@ -59,7 +62,11 @@ impl CLSAG {
             .collect::<Vec<_>>();
         let secret_scalar = scalar_random(rng);
         let mut current_index = (secret_index + 1) % ring_size;
-        hashes[current_index].update((secret_scalar * G).compress().as_bytes());
+        hashes[current_index].update(
+            (secret_scalar * RISTRETTO_BASEPOINT_POINT)
+                .compress()
+                .as_bytes(),
+        );
         hashes[current_index].update((secret_scalar * base_point).compress().as_bytes());
         let mut challenges = vec![scalar_zero(); ring_size];
         challenges[current_index] = scalar_from_hash(hashes[current_index].clone());
@@ -74,7 +81,10 @@ impl CLSAG {
                         response[current_index % ring_size],
                         challenges[current_index % ring_size],
                     ],
-                    &[G, aggregate_public_keys[current_index % ring_size]],
+                    &[
+                        RISTRETTO_BASEPOINT_POINT,
+                        aggregate_public_keys[current_index % ring_size],
+                    ],
                 )
                 .compress()
                 .as_bytes(),
@@ -151,7 +161,7 @@ impl CLSAG {
                 hash.update(
                     RistrettoPoint::multiscalar_mul(
                         &[response[i], challenge_1],
-                        &[G, aggregate_public_keys[i]],
+                        &[RISTRETTO_BASEPOINT_POINT, aggregate_public_keys[i]],
                     )
                     .compress()
                     .as_bytes(),
