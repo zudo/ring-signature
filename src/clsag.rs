@@ -50,7 +50,6 @@ impl CLSAG {
         let mut hashes = (0..ring_size)
             .map(|_| {
                 let mut hash = Hash::new();
-                hash.update(format!("CLSAG_c"));
                 for i in 0..ring_size {
                     for j in 0..ring_layers {
                         hash.update(rings[i][j].compress().as_bytes());
@@ -151,7 +150,6 @@ impl CLSAG {
                 CLSAG::aggregate_image::<Hash>(&rings, &prefixed_hashes_with_images, &images);
             for i in 0..ring_size {
                 let mut hash: Hash = Hash::new();
-                hash.update(format!("CLSAG_c"));
                 for j in 0..ring_size {
                     for k in 0..ring_layers {
                         hash.update(rings[j][k].compress().as_bytes());
