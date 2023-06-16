@@ -1,3 +1,7 @@
+pub mod blsag;
+pub mod clsag;
+pub mod mlsag;
+pub mod sag;
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::RistrettoPoint;
@@ -5,10 +9,6 @@ use curve25519_dalek::Scalar;
 use digest::typenum::U64;
 use digest::Digest;
 use rand_core::CryptoRngCore;
-pub mod blsag;
-pub mod clsag;
-pub mod mlsag;
-pub mod sag;
 pub const G: RistrettoPoint = RISTRETTO_BASEPOINT_POINT;
 pub fn point_from_slice(bytes: &[u8; 32]) -> Option<RistrettoPoint> {
     CompressedRistretto::from_slice(bytes).unwrap().decompress()
