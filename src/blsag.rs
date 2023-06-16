@@ -139,16 +139,14 @@ mod tests {
     const DATA_1: &str = "zudo";
     const X: usize = 2;
     lazy_static! {
-        static ref SECRET_0: Scalar = scalar_random(&mut OsRng {});
-        static ref SECRET_1: Scalar = scalar_random(&mut OsRng {});
-        static ref RING_0: Vec<RistrettoPoint> =
-            (0..X).map(|_| point_random(&mut OsRng {})).collect();
-        static ref RING_1: Vec<RistrettoPoint> =
-            (0..X).map(|_| point_random(&mut OsRng {})).collect();
+        static ref SECRET_0: Scalar = scalar_random(&mut OsRng);
+        static ref SECRET_1: Scalar = scalar_random(&mut OsRng);
+        static ref RING_0: Vec<RistrettoPoint> = (0..X).map(|_| point_random(&mut OsRng)).collect();
+        static ref RING_1: Vec<RistrettoPoint> = (0..X).map(|_| point_random(&mut OsRng)).collect();
     }
     #[test]
     fn sign_verify() {
-        let rng = &mut OsRng {};
+        let rng = &mut OsRng;
         let a = BLSAG::sign::<Sha512>(rng, &SECRET_0, RING_0.clone(), DATA_0).unwrap();
         let b = BLSAG::sign::<Sha512>(rng, &SECRET_0, RING_1.clone(), DATA_0).unwrap();
         let c = BLSAG::sign::<Sha512>(rng, &SECRET_1, RING_0.clone(), DATA_0).unwrap();
@@ -160,7 +158,7 @@ mod tests {
     }
     #[test]
     fn link() {
-        let rng = &mut OsRng {};
+        let rng = &mut OsRng;
         let a = BLSAG::sign::<Sha512>(rng, &SECRET_0, RING_0.clone(), DATA_1).unwrap();
         let b = BLSAG::sign::<Sha512>(rng, &SECRET_0, RING_1.clone(), DATA_0).unwrap();
         let c = BLSAG::sign::<Sha512>(rng, &SECRET_1, RING_0.clone(), DATA_0).unwrap();

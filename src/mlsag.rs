@@ -176,18 +176,18 @@ mod tests {
     const X: usize = 2;
     const Y: usize = 2;
     lazy_static! {
-        static ref SECRETS_0: Vec<Scalar> = (0..Y).map(|_| scalar_random(&mut OsRng {})).collect();
-        static ref SECRETS_1: Vec<Scalar> = (0..Y).map(|_| scalar_random(&mut OsRng {})).collect();
+        static ref SECRETS_0: Vec<Scalar> = (0..Y).map(|_| scalar_random(&mut OsRng)).collect();
+        static ref SECRETS_1: Vec<Scalar> = (0..Y).map(|_| scalar_random(&mut OsRng)).collect();
         static ref RINGS_0: Vec<Vec<RistrettoPoint>> = (0..X)
-            .map(|_| (0..Y).map(|_| point_random(&mut OsRng {})).collect())
+            .map(|_| (0..Y).map(|_| point_random(&mut OsRng)).collect())
             .collect();
         static ref RINGS_1: Vec<Vec<RistrettoPoint>> = (0..X)
-            .map(|_| (0..Y).map(|_| point_random(&mut OsRng {})).collect())
+            .map(|_| (0..Y).map(|_| point_random(&mut OsRng)).collect())
             .collect();
     }
     #[test]
     fn sign_verify() {
-        let rng = &mut OsRng {};
+        let rng = &mut OsRng;
         let a = MLSAG::sign::<Sha512>(rng, &SECRETS_0, RINGS_0.clone(), DATA_0).unwrap();
         let b = MLSAG::sign::<Sha512>(rng, &SECRETS_0, RINGS_1.clone(), DATA_0).unwrap();
         let c = MLSAG::sign::<Sha512>(rng, &SECRETS_1, RINGS_0.clone(), DATA_0).unwrap();
@@ -199,7 +199,7 @@ mod tests {
     }
     #[test]
     fn link() {
-        let rng = &mut OsRng {};
+        let rng = &mut OsRng;
         let a = MLSAG::sign::<Sha512>(rng, &SECRETS_0, RINGS_0.clone(), DATA_1).unwrap();
         let b = MLSAG::sign::<Sha512>(rng, &SECRETS_0, RINGS_1.clone(), DATA_0).unwrap();
         let c = MLSAG::sign::<Sha512>(rng, &SECRETS_1, RINGS_0.clone(), DATA_0).unwrap();
